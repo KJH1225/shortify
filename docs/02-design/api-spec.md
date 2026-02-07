@@ -236,7 +236,7 @@ YouTube URL로 분석 시작
 
 #### POST /api/highlights/{highlight_id}/export
 
-하이라이트를 숏폼 영상으로 내보내기
+하이라이트를 숏폼 영상으로 내보내기 (FFmpeg 사용)
 
 **Response** (200 OK):
 ```json
@@ -244,15 +244,55 @@ YouTube URL로 분석 시작
   "data": {
     "success": true,
     "message": "Export job created",
-    "export_id": "export_highlight-uuid",
-    "status": "processing",
-    "estimated_time": 30
+    "export_id": "export_abc12345",
+    "status": "pending",
+    "estimated_time": 30,
+    "highlight": {
+      "id": "highlight-uuid",
+      "title": "핵심 개념 설명",
+      "start_time": 45.0,
+      "end_time": 78.0,
+      "duration": 33.0
+    }
   }
 }
 ```
 
 **Errors**:
 - `404 Not Found`: 하이라이트를 찾을 수 없음
+- `404 Not Found`: 원본 영상을 찾을 수 없음
+
+---
+
+#### GET /api/highlights/{highlight_id}/export/{export_id}/status
+
+Export 작업 상태 조회
+
+**Response** (200 OK):
+```json
+{
+  "data": {
+    "export_id": "export_abc12345",
+    "highlight_id": "highlight-uuid",
+    "status": "completed",
+    "output_path": "./uploads/exports/highlight_45_78.mp4",
+    "error_message": null,
+    "created_at": "2026-02-08T00:00:00",
+    "completed_at": "2026-02-08T00:00:30"
+  }
+}
+```
+
+**Status Values**:
+| Status | Description |
+|--------|-------------|
+| `pending` | 작업 대기 중 |
+| `processing` | FFmpeg 처리 중 |
+| `completed` | 완료 |
+| `error` | 오류 발생 |
+
+**Errors**:
+- `404 Not Found`: Export 작업을 찾을 수 없음
 
 ---
 

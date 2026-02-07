@@ -28,7 +28,7 @@ export interface VideoResponse {
   duration: number | null;
   status: 'idle' | 'uploading' | 'processing' | 'completed' | 'error';
   progress: number;
-  message: string;
+  message: string | null;
   highlights: HighlightResponse[];
   created_at: string;
   updated_at: string;

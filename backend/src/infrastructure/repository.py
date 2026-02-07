@@ -19,7 +19,7 @@ class VideoRepository:
         video_id: str,
         title: str,
         source: VideoSource,
-        status: ProcessingStatus = ProcessingStatus.PENDING,
+        status: ProcessingStatus = ProcessingStatus.IDLE,
     ) -> Video:
         """Create a new video record"""
         video = Video(
@@ -167,7 +167,7 @@ def video_to_dict(video: Video) -> dict:
         "duration": video.duration,
         "status": video.status,
         "progress": video.progress,
-        "message": video.message,
+        "message": video.message or None,
         "highlights": [
             HighlightResponse(
                 id=h.id,
@@ -183,4 +183,5 @@ def video_to_dict(video: Video) -> dict:
             for h in video.highlights
         ],
         "created_at": video.created_at,
+        "updated_at": video.updated_at,
     }

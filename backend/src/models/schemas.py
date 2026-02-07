@@ -47,9 +47,10 @@ class VideoResponse(BaseModel):
     duration: float | None
     status: ProcessingStatus
     progress: int
-    message: str
+    message: str | None = None
     highlights: list[HighlightResponse]
     created_at: datetime
+    updated_at: datetime
 
 
 class YouTubeURLRequest(BaseModel):
