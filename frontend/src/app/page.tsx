@@ -8,28 +8,120 @@ import { useVideoStore } from '@/store/video-store';
 import type { Highlight } from '@/types';
 
 export default function Home() {
-  const { status, highlights, simulateProcessing } = useVideoStore();
+  const { status, highlights, setStatus, setHighlights, reset } = useVideoStore();
 
   const isProcessing = status.status === 'uploading' || status.status === 'processing';
 
-  const handleFileSelect = (file: File) => {
-    console.log('File selected:', file.name, file.size, file.type);
-    // TODO: 실제 API 연동 시 아래 코드로 교체
-    // const formData = new FormData();
-    // formData.append('file', file);
-    // fetch('/api/videos/upload', { method: 'POST', body: formData });
-    simulateProcessing();
+  const pollVideoStatus = async (videoId: string) => {
+    const maxAttempts = 60;
+    let attempts = 0;
+
+    const poll = async () => {
+      if (attempts >= maxAttempts) {
+        setStatus({
+          status: 'error',
+          progress: 0,
+          message: 'Processing timeout',
+        });
+        return;
+      }
+
+      try {
+        const response = await fetch(`http://localhost:8000/api/videos/${videoId}`);
+        if (!response.ok) throw new Error('Failed to fetch video status');
+
+        const data = await response.json();
+
+        setStatus({
+          status: data.status,
+          progress: data.progress,
+          message: data.message,
+        });
+
+        if (data.status === 'completed') {
+          setHighlights(data.highlights.map((h: any) => ({
+            id: h.id,
+            startTime: h.start_time,
+            endTime: h.end_time,
+            title: h.title,
+            description: h.description,
+            score: h.score,
+            thumbnailUrl: h.thumbnail_url,
+          })));
+        } else if (data.status === 'error') {
+          return;
+        } else {
+          attempts++;
+          setTimeout(poll, 2000);
+        }
+      } catch (error) {
+        setStatus({
+          status: 'error',
+          progress: 0,
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    };
+
+    poll();
   };
 
-  const handleUrlSubmit = (url: string) => {
+  const handleFileSelect = async (file: File) => {
+    console.log('File selected:', file.name, file.size, file.type);
+
+    reset();
+    setStatus({ status: 'uploading', progress: 0, message: 'Uploading video...' });
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('http://localhost:8000/api/videos/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const data = await response.json();
+      pollVideoStatus(data.id);
+    } catch (error) {
+      setStatus({
+        status: 'error',
+        progress: 0,
+        message: error instanceof Error ? error.message : 'Upload failed',
+      });
+    }
+  };
+
+  const handleUrlSubmit = async (url: string) => {
     console.log('URL submitted:', url);
-    // TODO: 실제 API 연동 시 아래 코드로 교체
-    // fetch('/api/videos/youtube', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ url })
-    // });
-    simulateProcessing();
+
+    reset();
+    setStatus({ status: 'uploading', progress: 0, message: 'Processing YouTube URL...' });
+
+    try {
+      const response = await fetch('http://localhost:8000/api/videos/youtube', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+
+      if (!response.ok) {
+        throw new Error('YouTube processing failed');
+      }
+
+      const data = await response.json();
+      pollVideoStatus(data.id);
+    } catch (error) {
+      setStatus({
+        status: 'error',
+        progress: 0,
+        message: error instanceof Error ? error.message : 'YouTube processing failed',
+      });
+    }
   };
 
   const handlePlay = (highlight: Highlight) => {
@@ -37,9 +129,25 @@ export default function Home() {
     // TODO: 영상 플레이어 연동
   };
 
-  const handleExport = (highlight: Highlight) => {
+  const handleExport = async (highlight: Highlight) => {
     console.log('Export highlight:', highlight.title);
-    // TODO: 숏폼 내보내기 API 연동
+
+    try {
+      const response = await fetch(`http://localhost:8000/api/highlights/${highlight.id}/export`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error('Export failed');
+      }
+
+      const data = await response.json();
+      console.log('Export started:', data);
+      alert(`Export started! Job ID: ${data.export_id}`);
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('Export failed');
+    }
   };
 
   return (

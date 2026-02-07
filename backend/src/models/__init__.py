@@ -9,6 +9,7 @@ from .schemas import (
     YouTubeURLRequest,
     ProcessingUpdate,
 )
+from .response import ApiResponse, ApiError
 
 __all__ = [
     "ProcessingStatus",
@@ -20,4 +21,6 @@ __all__ = [
     "VideoResponse",
     "YouTubeURLRequest",
     "ProcessingUpdate",
+    "ApiResponse",
+    "ApiError",
 ]

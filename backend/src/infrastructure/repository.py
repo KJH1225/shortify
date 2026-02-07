@@ -128,6 +128,22 @@ class HighlightRepository:
         )
         return list(result.scalars().all())
 
+    async def get_by_id(self, highlight_id: str) -> Optional[Highlight]:
+        """Get highlight by ID"""
+        result = await self.db.execute(
+            select(Highlight).where(Highlight.id == highlight_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def delete(self, highlight_id: str) -> bool:
+        """Delete a highlight by ID"""
+        highlight = await self.get_by_id(highlight_id)
+        if highlight:
+            await self.db.delete(highlight)
+            await self.db.flush()
+            return True
+        return False
+
     async def delete_by_video_id(self, video_id: str) -> int:
         """Delete all highlights for a video"""
         highlights = await self.get_by_video_id(video_id)
