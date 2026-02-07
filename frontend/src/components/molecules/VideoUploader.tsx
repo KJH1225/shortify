@@ -1,11 +1,46 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Upload, Link, FileVideo } from 'lucide-react';
+import { Upload, Link, FileVideo, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+// 파일 검증 설정
+const ALLOWED_EXTENSIONS = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'];
+const ALLOWED_MIME_TYPES = [
+  'video/mp4', 'video/quicktime', 'video/x-msvideo',
+  'video/x-matroska', 'video/webm', 'video/x-m4v'
+];
+const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
+
+// YouTube URL 검증
+const YOUTUBE_URL_REGEX = /^https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}/;
+
+function validateFile(file: File): { valid: boolean; error?: string } {
+  // 확장자 검증
+  const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+  if (!ALLOWED_EXTENSIONS.includes(ext)) {
+    return { valid: false, error: `지원하지 않는 파일 형식입니다. (${ALLOWED_EXTENSIONS.join(', ')})` };
+  }
+
+  // MIME 타입 검증
+  if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+    return { valid: false, error: '유효한 영상 파일이 아닙니다.' };
+  }
+
+  // 파일 크기 검증
+  if (file.size > MAX_FILE_SIZE) {
+    return { valid: false, error: '파일 크기가 2GB를 초과합니다.' };
+  }
+
+  return { valid: true };
+}
+
+function validateYouTubeUrl(url: string): boolean {
+  return YOUTUBE_URL_REGEX.test(url);
+}
 
 interface VideoUploaderProps {
   onFileSelect: (file: File) => void;
@@ -16,6 +51,7 @@ interface VideoUploaderProps {
 export function VideoUploader({ onFileSelect, onUrlSubmit, isProcessing }: VideoUploaderProps) {
   const [url, setUrl] = useState('');
   const [dragActive, setDragActive] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -31,31 +67,55 @@ export function VideoUploader({ onFileSelect, onUrlSubmit, isProcessing }: Video
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
+    setError(null);
 
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
-      if (file.type.startsWith('video/')) {
+      const validation = validateFile(file);
+      if (validation.valid) {
         onFileSelect(file);
+      } else {
+        setError(validation.error || '파일 검증에 실패했습니다.');
       }
     }
   }, [onFileSelect]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setError(null);
     if (e.target.files && e.target.files[0]) {
-      onFileSelect(e.target.files[0]);
+      const file = e.target.files[0];
+      const validation = validateFile(file);
+      if (validation.valid) {
+        onFileSelect(file);
+      } else {
+        setError(validation.error || '파일 검증에 실패했습니다.');
+      }
     }
   };
 
   const handleUrlSubmit = () => {
-    if (url.trim()) {
-      onUrlSubmit(url.trim());
-      setUrl('');
+    setError(null);
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) return;
+
+    if (!validateYouTubeUrl(trimmedUrl)) {
+      setError('유효한 YouTube URL이 아닙니다.');
+      return;
     }
+
+    onUrlSubmit(trimmedUrl);
+    setUrl('');
   };
 
   return (
     <Card className="w-full max-w-2xl mx-auto border-border/50 bg-card/50 backdrop-blur">
       <CardContent className="p-6">
+        {error && (
+          <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-center gap-2 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4 flex-shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
         <Tabs defaultValue="upload" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="upload" className="gap-2">

@@ -1,5 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from collections import defaultdict
+import time
 from api import videos, highlights
 
 app = FastAPI(
@@ -7,6 +10,38 @@ app = FastAPI(
     description="AI 영상 하이라이트 추출 서비스 API",
     version="0.1.0"
 )
+
+# Rate Limiting 설정
+RATE_LIMIT_REQUESTS = 60  # 요청 수
+RATE_LIMIT_WINDOW = 60  # 초 단위 윈도우
+rate_limit_store: dict[str, list[float]] = defaultdict(list)
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """간단한 Rate Limiting 미들웨어"""
+    client_ip = request.client.host if request.client else "unknown"
+    current_time = time.time()
+
+    # 윈도우 밖의 오래된 요청 제거
+    rate_limit_store[client_ip] = [
+        req_time for req_time in rate_limit_store[client_ip]
+        if current_time - req_time < RATE_LIMIT_WINDOW
+    ]
+
+    # Rate limit 체크
+    if len(rate_limit_store[client_ip]) >= RATE_LIMIT_REQUESTS:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."}
+        )
+
+    # 현재 요청 기록
+    rate_limit_store[client_ip].append(current_time)
+
+    response = await call_next(request)
+    return response
+
 
 # CORS 설정
 app.add_middleware(

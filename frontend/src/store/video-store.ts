@@ -1,54 +1,115 @@
 import { create } from 'zustand';
-import type { VideoProject, Highlight, ProcessingStatus } from '@/types';
+import type { Highlight, ProcessingStatus } from '@/types';
 
-interface VideoStore {
-  projects: VideoProject[];
-  currentProject: VideoProject | null;
+// 공통 Mock 데이터 (Backend와 동기화)
+export const MOCK_HIGHLIGHTS: Highlight[] = [
+  {
+    id: 'h1',
+    startTime: 45,
+    endTime: 78,
+    title: '핵심 개념 설명',
+    description: '영상에서 가장 중요한 핵심 개념을 설명하는 구간입니다.',
+    score: 0.95,
+  },
+  {
+    id: 'h2',
+    startTime: 120,
+    endTime: 165,
+    title: '놀라운 반전',
+    description: '시청자들의 반응이 가장 뜨거웠던 반전 구간입니다.',
+    score: 0.92,
+  },
+  {
+    id: 'h3',
+    startTime: 210,
+    endTime: 245,
+    title: '실용적인 팁',
+    description: '바로 적용할 수 있는 실용적인 팁을 공유하는 구간입니다.',
+    score: 0.88,
+  },
+  {
+    id: 'h4',
+    startTime: 300,
+    endTime: 340,
+    title: '감동적인 순간',
+    description: '영상에서 가장 감동적인 순간이 담긴 구간입니다.',
+    score: 0.85,
+  },
+  {
+    id: 'h5',
+    startTime: 420,
+    endTime: 480,
+    title: '결론 및 요약',
+    description: '전체 내용을 깔끔하게 정리하는 마무리 구간입니다.',
+    score: 0.82,
+  },
+];
 
-  setCurrentProject: (project: VideoProject | null) => void;
-  addProject: (project: VideoProject) => void;
-  updateProjectStatus: (projectId: string, status: ProcessingStatus) => void;
-  addHighlights: (projectId: string, highlights: Highlight[]) => void;
-  removeProject: (projectId: string) => void;
+// 분석 단계 메시지 (Backend와 동기화)
+export const PROCESSING_MESSAGES = [
+  '오디오 트랙 추출 중...',
+  '음성을 텍스트로 변환 중...',
+  '감정 분석 진행 중...',
+  '하이라이트 구간 탐지 중...',
+  '최적의 클립 선택 중...',
+];
+
+interface VideoState {
+  // 현재 처리 상태
+  status: ProcessingStatus;
+  highlights: Highlight[];
+
+  // 액션
+  setStatus: (status: ProcessingStatus) => void;
+  setHighlights: (highlights: Highlight[]) => void;
+  reset: () => void;
+
+  // 시뮬레이션 (개발용)
+  simulateProcessing: () => Promise<void>;
 }
 
-export const useVideoStore = create<VideoStore>((set) => ({
-  projects: [],
-  currentProject: null,
+const initialStatus: ProcessingStatus = {
+  status: 'idle',
+  progress: 0,
+  message: '',
+};
 
-  setCurrentProject: (project) => set({ currentProject: project }),
+export const useVideoStore = create<VideoState>((set) => ({
+  status: initialStatus,
+  highlights: [],
 
-  addProject: (project) =>
-    set((state) => ({
-      projects: [...state.projects, project],
-      currentProject: project
-    })),
+  setStatus: (status) => set({ status }),
+  setHighlights: (highlights) => set({ highlights }),
+  reset: () => set({ status: initialStatus, highlights: [] }),
 
-  updateProjectStatus: (projectId, status) =>
-    set((state) => ({
-      projects: state.projects.map((p) =>
-        p.id === projectId ? { ...p, status } : p
-      ),
-      currentProject: state.currentProject?.id === projectId
-        ? { ...state.currentProject, status }
-        : state.currentProject
-    })),
+  simulateProcessing: async () => {
+    // 업로드 단계
+    set({ status: { status: 'uploading', progress: 0, message: '영상 업로드 중...' } });
 
-  addHighlights: (projectId, highlights) =>
-    set((state) => ({
-      projects: state.projects.map((p) =>
-        p.id === projectId ? { ...p, highlights } : p
-      ),
-      currentProject: state.currentProject?.id === projectId
-        ? { ...state.currentProject, highlights }
-        : state.currentProject
-    })),
+    for (let i = 0; i <= 30; i += 10) {
+      await new Promise(r => setTimeout(r, 200));
+      set({ status: { status: 'uploading', progress: i, message: '영상 업로드 중...' } });
+    }
 
-  removeProject: (projectId) =>
-    set((state) => ({
-      projects: state.projects.filter((p) => p.id !== projectId),
-      currentProject: state.currentProject?.id === projectId
-        ? null
-        : state.currentProject
-    })),
+    // 분석 단계
+    set({ status: { status: 'processing', progress: 30, message: 'AI가 영상을 분석하고 있어요...' } });
+
+    for (let i = 0; i < PROCESSING_MESSAGES.length; i++) {
+      await new Promise(r => setTimeout(r, 800));
+      const progress = 30 + ((i + 1) * 15);
+      set({
+        status: {
+          status: 'processing',
+          progress: Math.min(progress, 95),
+          message: PROCESSING_MESSAGES[i]
+        }
+      });
+    }
+
+    // 완료
+    set({
+      status: { status: 'completed', progress: 100, message: '분석이 완료되었습니다!' },
+      highlights: MOCK_HIGHLIGHTS
+    });
+  },
 }));

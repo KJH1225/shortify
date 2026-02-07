@@ -1,9 +1,22 @@
 'use client';
 
+import Image from 'next/image';
 import { Play, Download, Clock, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import type { Highlight } from '@/types';
+
+// 허용된 이미지 도메인 검증
+const ALLOWED_IMAGE_DOMAINS = ['localhost', 'i.ytimg.com', 'img.youtube.com'];
+
+function isValidImageUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return ALLOWED_IMAGE_DOMAINS.some(domain => parsed.hostname.includes(domain));
+  } catch {
+    return false;
+  }
+}
 
 interface HighlightCardProps {
   highlight: Highlight;
@@ -24,11 +37,13 @@ export function HighlightCard({ highlight, onPlay, onExport }: HighlightCardProp
     <Card className="group overflow-hidden border-border/50 bg-card/50 backdrop-blur hover:border-violet-500/50 transition-all">
       <CardContent className="p-0">
         <div className="relative aspect-video bg-muted">
-          {highlight.thumbnailUrl ? (
-            <img
+          {highlight.thumbnailUrl && isValidImageUrl(highlight.thumbnailUrl) ? (
+            <Image
               src={highlight.thumbnailUrl}
               alt={highlight.title}
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
+              unoptimized={highlight.thumbnailUrl.startsWith('http')}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20">
