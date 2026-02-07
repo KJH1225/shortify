@@ -7,6 +7,8 @@ import { HighlightGrid } from '@/components/organisms/HighlightGrid';
 import { useVideoStore } from '@/store/video-store';
 import type { Highlight } from '@/types';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 export default function Home() {
   const { status, highlights, setStatus, setHighlights, reset } = useVideoStore();
 
@@ -27,7 +29,7 @@ export default function Home() {
       }
 
       try {
-        const response = await fetch(`http://localhost:8000/api/videos/${videoId}`);
+        const response = await fetch(`${API_URL}/api/videos/${videoId}`);
         if (!response.ok) throw new Error('Failed to fetch video status');
 
         const data = await response.json();
@@ -76,7 +78,7 @@ export default function Home() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('http://localhost:8000/api/videos/upload', {
+      const response = await fetch(`${API_URL}/api/videos/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -103,7 +105,7 @@ export default function Home() {
     setStatus({ status: 'uploading', progress: 0, message: 'Processing YouTube URL...' });
 
     try {
-      const response = await fetch('http://localhost:8000/api/videos/youtube', {
+      const response = await fetch(`${API_URL}/api/videos/youtube`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
@@ -133,7 +135,7 @@ export default function Home() {
     console.log('Export highlight:', highlight.title);
 
     try {
-      const response = await fetch(`http://localhost:8000/api/highlights/${highlight.id}/export`, {
+      const response = await fetch(`${API_URL}/api/highlights/${highlight.id}/export`, {
         method: 'POST',
       });
 

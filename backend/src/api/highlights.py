@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from models import HighlightResponse
+from models import HighlightResponse, ApiResponse
 from infrastructure.database import get_db
 from infrastructure.repository import HighlightRepository
 
@@ -39,13 +39,13 @@ async def export_highlight(highlight_id: str, db: AsyncSession = Depends(get_db)
         raise HTTPException(status_code=404, detail="Highlight not found")
 
     # Mock 응답 - 실제 영상 처리는 추후 구현
-    return {
+    return ApiResponse(data={
         "success": True,
         "message": "Export job created",
         "export_id": f"export_{highlight_id}",
         "status": "processing",
         "estimated_time": 30,
-    }
+    })
 
 
 @router.delete("/{highlight_id}")
@@ -57,4 +57,4 @@ async def delete_highlight(highlight_id: str, db: AsyncSession = Depends(get_db)
     if not success:
         raise HTTPException(status_code=404, detail="Highlight not found")
 
-    return {"success": True, "message": "Highlight deleted"}
+    return ApiResponse(data={"success": True, "message": "Highlight deleted"})

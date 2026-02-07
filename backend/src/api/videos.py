@@ -1,7 +1,7 @@
 import re
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from models import VideoResponse, YouTubeURLRequest, ProcessingStatus, VideoSource
+from models import VideoResponse, YouTubeURLRequest, ProcessingStatus, VideoSource, ApiResponse
 from services.video_processor import VideoProcessor
 from infrastructure.database import get_db
 from infrastructure.repository import VideoRepository, video_to_dict
@@ -144,4 +144,4 @@ async def delete_video(video_id: str, db: AsyncSession = Depends(get_db)):
     if not deleted:
         raise HTTPException(status_code=404, detail="영상을 찾을 수 없습니다")
 
-    return {"message": "삭제되었습니다"}
+    return ApiResponse(data={"success": True, "message": "삭제되었습니다"})
