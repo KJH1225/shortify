@@ -4,7 +4,7 @@ import { MainLayout } from '@/components/templates/MainLayout';
 import { VideoUploader } from '@/components/molecules/VideoUploader';
 import { ProcessingStatus } from '@/components/molecules/ProcessingStatus';
 import { HighlightGrid } from '@/components/organisms/HighlightGrid';
-import { useVideoStore } from '@/store/video-store';
+import { useVideoStore } from '@/store/videoStore';
 import type { Highlight } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
