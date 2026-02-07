@@ -1,0 +1,80 @@
+'use client';
+
+import { Play, Download, Clock, Star } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import type { Highlight } from '@/types';
+
+interface HighlightCardProps {
+  highlight: Highlight;
+  onPlay: (highlight: Highlight) => void;
+  onExport: (highlight: Highlight) => void;
+}
+
+function formatTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+export function HighlightCard({ highlight, onPlay, onExport }: HighlightCardProps) {
+  const duration = highlight.endTime - highlight.startTime;
+
+  return (
+    <Card className="group overflow-hidden border-border/50 bg-card/50 backdrop-blur hover:border-violet-500/50 transition-all">
+      <CardContent className="p-0">
+        <div className="relative aspect-video bg-muted">
+          {highlight.thumbnailUrl ? (
+            <img
+              src={highlight.thumbnailUrl}
+              alt={highlight.title}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20">
+              <Play className="h-12 w-12 text-muted-foreground" />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+            <Button
+              size="icon"
+              variant="secondary"
+              className="rounded-full"
+              onClick={() => onPlay(highlight)}
+            >
+              <Play className="h-5 w-5" />
+            </Button>
+            <Button
+              size="icon"
+              variant="secondary"
+              className="rounded-full"
+              onClick={() => onExport(highlight)}
+            >
+              <Download className="h-5 w-5" />
+            </Button>
+          </div>
+          <div className="absolute bottom-2 right-2 px-2 py-1 rounded bg-black/70 text-xs text-white">
+            {formatTime(duration)}
+          </div>
+        </div>
+
+        <div className="p-4 space-y-2">
+          <h3 className="font-semibold line-clamp-1">{highlight.title}</h3>
+          <p className="text-sm text-muted-foreground line-clamp-2">
+            {highlight.description}
+          </p>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              <span>{formatTime(highlight.startTime)} - {formatTime(highlight.endTime)}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Star className="h-3 w-3 text-yellow-500" />
+              <span>{Math.round(highlight.score * 100)}%</span>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
