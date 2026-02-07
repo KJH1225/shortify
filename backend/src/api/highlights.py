@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from models import HighlightResponse, ApiResponse
+from models import HighlightResponse, ApiResponse, ApiError
 from infrastructure.database import get_db
 from infrastructure.repository import HighlightRepository
 
@@ -14,7 +14,14 @@ async def get_highlight(highlight_id: str, db: AsyncSession = Depends(get_db)):
     highlight = await repo.get_by_id(highlight_id)
 
     if not highlight:
-        raise HTTPException(status_code=404, detail="Highlight not found")
+        raise HTTPException(
+            status_code=404,
+            detail=ApiError(
+                code="HIGHLIGHT_NOT_FOUND",
+                message="하이라이트를 찾을 수 없습니다",
+                details={"highlight_id": highlight_id}
+            ).model_dump()
+        )
 
     return HighlightResponse(
         id=highlight.id,
@@ -36,7 +43,14 @@ async def export_highlight(highlight_id: str, db: AsyncSession = Depends(get_db)
     highlight = await repo.get_by_id(highlight_id)
 
     if not highlight:
-        raise HTTPException(status_code=404, detail="Highlight not found")
+        raise HTTPException(
+            status_code=404,
+            detail=ApiError(
+                code="HIGHLIGHT_NOT_FOUND",
+                message="하이라이트를 찾을 수 없습니다",
+                details={"highlight_id": highlight_id}
+            ).model_dump()
+        )
 
     # Mock 응답 - 실제 영상 처리는 추후 구현
     return ApiResponse(data={
@@ -55,6 +69,13 @@ async def delete_highlight(highlight_id: str, db: AsyncSession = Depends(get_db)
     success = await repo.delete(highlight_id)
 
     if not success:
-        raise HTTPException(status_code=404, detail="Highlight not found")
+        raise HTTPException(
+            status_code=404,
+            detail=ApiError(
+                code="HIGHLIGHT_NOT_FOUND",
+                message="하이라이트를 찾을 수 없습니다",
+                details={"highlight_id": highlight_id}
+            ).model_dump()
+        )
 
     return ApiResponse(data={"success": True, "message": "Highlight deleted"})

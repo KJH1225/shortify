@@ -1,7 +1,7 @@
 import re
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from models import VideoResponse, YouTubeURLRequest, ProcessingStatus, VideoSource, ApiResponse
+from models import VideoResponse, YouTubeURLRequest, ProcessingStatus, VideoSource, ApiResponse, ApiError
 from services.video_processor import VideoProcessor
 from infrastructure.database import get_db
 from infrastructure.repository import VideoRepository, video_to_dict
@@ -46,21 +46,33 @@ async def upload_video(
     if not file.content_type or file.content_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(
             status_code=400,
-            detail=f"지원하지 않는 파일 형식입니다. 지원 형식: {', '.join(ALLOWED_EXTENSIONS)}"
+            detail=ApiError(
+                code="INVALID_MIME_TYPE",
+                message="지원하지 않는 파일 형식입니다",
+                details={"supported_types": list(ALLOWED_EXTENSIONS)}
+            ).model_dump()
         )
 
     # 파일 확장자 검증
     if not validate_file_extension(file.filename or ''):
         raise HTTPException(
             status_code=400,
-            detail=f"지원하지 않는 파일 확장자입니다. 지원 형식: {', '.join(ALLOWED_EXTENSIONS)}"
+            detail=ApiError(
+                code="INVALID_FILE_EXTENSION",
+                message="지원하지 않는 파일 확장자입니다",
+                details={"supported_extensions": list(ALLOWED_EXTENSIONS)}
+            ).model_dump()
         )
 
     # 파일 크기 검증 (Content-Length 헤더 기반)
     if file.size and file.size > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=400,
-            detail=f"파일 크기가 너무 큽니다. 최대 {MAX_FILE_SIZE // (1024*1024*1024)}GB까지 업로드 가능합니다."
+            detail=ApiError(
+                code="FILE_TOO_LARGE",
+                message="파일 크기가 너무 큽니다",
+                details={"max_size_gb": MAX_FILE_SIZE // (1024*1024*1024)}
+            ).model_dump()
         )
 
     video_id = str(uuid.uuid4())
@@ -94,7 +106,11 @@ async def process_youtube(
     if not video_id_yt:
         raise HTTPException(
             status_code=400,
-            detail="유효한 YouTube URL이 아닙니다. YouTube 영상 URL을 입력해주세요."
+            detail=ApiError(
+                code="INVALID_YOUTUBE_URL",
+                message="유효한 YouTube URL이 아닙니다",
+                details={"provided_url": request.url}
+            ).model_dump()
         )
 
     video_id = str(uuid.uuid4())
@@ -122,7 +138,14 @@ async def get_video(video_id: str, db: AsyncSession = Depends(get_db)):
     video = await repo.get_by_id(video_id)
 
     if not video:
-        raise HTTPException(status_code=404, detail="영상을 찾을 수 없습니다")
+        raise HTTPException(
+            status_code=404,
+            detail=ApiError(
+                code="VIDEO_NOT_FOUND",
+                message="영상을 찾을 수 없습니다",
+                details={"video_id": video_id}
+            ).model_dump()
+        )
 
     return VideoResponse(**video_to_dict(video))
 
@@ -142,6 +165,13 @@ async def delete_video(video_id: str, db: AsyncSession = Depends(get_db)):
     deleted = await repo.delete(video_id)
 
     if not deleted:
-        raise HTTPException(status_code=404, detail="영상을 찾을 수 없습니다")
+        raise HTTPException(
+            status_code=404,
+            detail=ApiError(
+                code="VIDEO_NOT_FOUND",
+                message="영상을 찾을 수 없습니다",
+                details={"video_id": video_id}
+            ).model_dump()
+        )
 
     return ApiResponse(data={"success": True, "message": "삭제되었습니다"})
