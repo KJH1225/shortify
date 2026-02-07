@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     debug: bool = True
 
     # 데이터베이스
+    # MySQL: mysql+aiomysql://user:password@localhost:3306/shortify
+    # SQLite: sqlite+aiosqlite:///./shortify.db
     database_url: str = "sqlite+aiosqlite:///./shortify.db"
 
     # OpenAI

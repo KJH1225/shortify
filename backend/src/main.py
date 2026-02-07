@@ -3,12 +3,26 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from collections import defaultdict
 import time
+from contextlib import asynccontextmanager
 from api import videos, highlights
+from infrastructure.database import init_db, close_db
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """애플리케이션 라이프사이클 관리"""
+    # Startup: DB 초기화
+    await init_db()
+    yield
+    # Shutdown: DB 연결 종료
+    await close_db()
+
 
 app = FastAPI(
     title="Shortify API",
     description="AI 영상 하이라이트 추출 서비스 API",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan,
 )
 
 # Rate Limiting 설정

@@ -1,32 +1,20 @@
 import re
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 from models import VideoResponse, YouTubeURLRequest, ProcessingStatus, VideoSource
 from services.video_processor import VideoProcessor
-from datetime import datetime
+from infrastructure.database import get_db
+from infrastructure.repository import VideoRepository, video_to_dict
+from core.constants import (
+    ALLOWED_EXTENSIONS,
+    ALLOWED_MIME_TYPES,
+    MAX_FILE_SIZE,
+    YOUTUBE_URL_PATTERNS,
+)
 import uuid
 
 router = APIRouter()
-
-# 임시 저장소 (실제로는 DB 사용)
-videos_db: dict[str, dict] = {}
 processor = VideoProcessor()
-
-# 파일 검증 설정
-ALLOWED_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'}
-ALLOWED_MIME_TYPES = {
-    'video/mp4', 'video/quicktime', 'video/x-msvideo',
-    'video/x-matroska', 'video/webm', 'video/x-m4v'
-}
-MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024  # 2GB
-
-# YouTube URL 패턴
-YOUTUBE_URL_PATTERNS = [
-    r'^https?://(?:www\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]{11})',
-    r'^https?://(?:www\.)?youtube\.com/embed/([a-zA-Z0-9_-]{11})',
-    r'^https?://(?:www\.)?youtube\.com/v/([a-zA-Z0-9_-]{11})',
-    r'^https?://youtu\.be/([a-zA-Z0-9_-]{11})',
-    r'^https?://(?:www\.)?youtube\.com/shorts/([a-zA-Z0-9_-]{11})',
-]
 
 
 def validate_youtube_url(url: str) -> str | None:
@@ -49,7 +37,8 @@ def validate_file_extension(filename: str) -> bool:
 @router.post("/upload", response_model=VideoResponse)
 async def upload_video(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
 ):
     """영상 파일 업로드 및 분석 시작"""
 
@@ -75,31 +64,28 @@ async def upload_video(
         )
 
     video_id = str(uuid.uuid4())
+    repo = VideoRepository(db)
 
-    video_data = {
-        "id": video_id,
-        "title": file.filename or "Untitled",
-        "source": VideoSource(type="file", filename=file.filename),
-        "duration": None,
-        "status": ProcessingStatus.UPLOADING,
-        "progress": 0,
-        "message": "업로드 중...",
-        "highlights": [],
-        "created_at": datetime.now(),
-    }
-
-    videos_db[video_id] = video_data
+    # DB에 비디오 레코드 생성
+    video = await repo.create(
+        video_id=video_id,
+        title=file.filename or "Untitled",
+        source=VideoSource(type="file", filename=file.filename),
+        status=ProcessingStatus.UPLOADING,
+    )
+    await repo.update_status(video_id, ProcessingStatus.UPLOADING, 0, "업로드 중...")
 
     # 백그라운드에서 처리
-    background_tasks.add_task(processor.process_file, video_id, file, videos_db)
+    background_tasks.add_task(processor.process_file, video_id, file)
 
-    return VideoResponse(**video_data)
+    return VideoResponse(**video_to_dict(video))
 
 
 @router.post("/youtube", response_model=VideoResponse)
 async def process_youtube(
     background_tasks: BackgroundTasks,
-    request: YouTubeURLRequest
+    request: YouTubeURLRequest,
+    db: AsyncSession = Depends(get_db),
 ):
     """YouTube URL로 분석 시작"""
 
@@ -112,49 +98,50 @@ async def process_youtube(
         )
 
     video_id = str(uuid.uuid4())
+    repo = VideoRepository(db)
 
-    video_data = {
-        "id": video_id,
-        "title": f"YouTube: {video_id_yt}",
-        "source": VideoSource(type="youtube", url=request.url),
-        "duration": None,
-        "status": ProcessingStatus.PROCESSING,
-        "progress": 0,
-        "message": "YouTube 영상 정보 가져오는 중...",
-        "highlights": [],
-        "created_at": datetime.now(),
-    }
-
-    videos_db[video_id] = video_data
+    # DB에 비디오 레코드 생성
+    video = await repo.create(
+        video_id=video_id,
+        title=f"YouTube: {video_id_yt}",
+        source=VideoSource(type="youtube", url=request.url),
+        status=ProcessingStatus.PROCESSING,
+    )
+    await repo.update_status(video_id, ProcessingStatus.PROCESSING, 0, "YouTube 영상 정보 가져오는 중...")
 
     # 백그라운드에서 처리
-    background_tasks.add_task(processor.process_youtube, video_id, request.url, videos_db)
+    background_tasks.add_task(processor.process_youtube, video_id, request.url)
 
-    return VideoResponse(**video_data)
+    return VideoResponse(**video_to_dict(video))
 
 
 @router.get("/{video_id}", response_model=VideoResponse)
-async def get_video(video_id: str):
+async def get_video(video_id: str, db: AsyncSession = Depends(get_db)):
     """영상 정보 조회"""
+    repo = VideoRepository(db)
+    video = await repo.get_by_id(video_id)
 
-    if video_id not in videos_db:
+    if not video:
         raise HTTPException(status_code=404, detail="영상을 찾을 수 없습니다")
 
-    return VideoResponse(**videos_db[video_id])
+    return VideoResponse(**video_to_dict(video))
 
 
 @router.get("/", response_model=list[VideoResponse])
-async def list_videos():
+async def list_videos(db: AsyncSession = Depends(get_db)):
     """모든 영상 목록 조회"""
-    return [VideoResponse(**v) for v in videos_db.values()]
+    repo = VideoRepository(db)
+    videos = await repo.list_all()
+    return [VideoResponse(**video_to_dict(v)) for v in videos]
 
 
 @router.delete("/{video_id}")
-async def delete_video(video_id: str):
+async def delete_video(video_id: str, db: AsyncSession = Depends(get_db)):
     """영상 삭제"""
+    repo = VideoRepository(db)
+    deleted = await repo.delete(video_id)
 
-    if video_id not in videos_db:
+    if not deleted:
         raise HTTPException(status_code=404, detail="영상을 찾을 수 없습니다")
 
-    del videos_db[video_id]
     return {"message": "삭제되었습니다"}
