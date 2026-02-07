@@ -25,7 +25,7 @@ class Video(Base):
     source_filename = Column(String(255), nullable=True)
 
     duration = Column(Float, nullable=True)
-    status = Column(SQLEnum(ProcessingStatus), nullable=False, default=ProcessingStatus.PENDING)
+    status = Column(SQLEnum(ProcessingStatus), nullable=False, default=ProcessingStatus.IDLE)
     progress = Column(Integer, default=0)
     message = Column(Text, default="")
 
@@ -49,7 +49,7 @@ class Highlight(Base):
     start_time = Column(Float, nullable=False)
     end_time = Column(Float, nullable=False)
     title = Column(String(255), nullable=False)
-    description = Column(Text, nullable=False)
+    description = Column(Text, nullable=True)
     score = Column(Float, nullable=False)
     thumbnail_url = Column(String(512), nullable=True)
 

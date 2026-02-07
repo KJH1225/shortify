@@ -1,0 +1,29 @@
+Generic single-database configuration with an async dbapi.
+
+## Usage
+
+### Generate a new migration (autogenerate from model changes)
+```bash
+cd backend
+alembic revision --autogenerate -m "description of changes"
+```
+
+### Apply all pending migrations
+```bash
+alembic upgrade head
+```
+
+### Downgrade one revision
+```bash
+alembic downgrade -1
+```
+
+### Show current revision
+```bash
+alembic current
+```
+
+### Show migration history
+```bash
+alembic history
+```

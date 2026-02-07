@@ -4,7 +4,7 @@ from enum import Enum
 
 
 class ProcessingStatus(str, Enum):
-    PENDING = "pending"
+    IDLE = "idle"
     UPLOADING = "uploading"
     PROCESSING = "processing"
     COMPLETED = "completed"
@@ -21,7 +21,7 @@ class HighlightBase(BaseModel):
     start_time: float
     end_time: float
     title: str
-    description: str
+    description: str | None = None
     score: float
     thumbnail_url: str | None = None
 

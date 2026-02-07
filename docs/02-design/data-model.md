@@ -40,7 +40,7 @@ Shortify의 데이터 모델은 영상(Video)과 하이라이트(Highlight) 두 
 │ start_time: float                   │
 │ end_time: float                     │
 │ title: string(255)                  │
-│ description: text                   │
+│ description: text?                  │
 │ score: float                        │
 │ thumbnail_url: string(512)?         │
 │ created_at: datetime                │

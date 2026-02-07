@@ -5,9 +5,8 @@ import { VideoUploader } from '@/components/molecules/VideoUploader';
 import { ProcessingStatus } from '@/components/molecules/ProcessingStatus';
 import { HighlightGrid } from '@/components/organisms/HighlightGrid';
 import { useVideoStore } from '@/store/videoStore';
+import { videoApi, highlightApi, ApiRequestError } from '@/services/api';
 import type { Highlight } from '@/types';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export default function Home() {
   const { status, highlights, setStatus, setHighlights, reset } = useVideoStore();
@@ -29,10 +28,7 @@ export default function Home() {
       }
 
       try {
-        const response = await fetch(`${API_URL}/api/videos/${videoId}`);
-        if (!response.ok) throw new Error('Failed to fetch video status');
-
-        const data = await response.json();
+        const data = await videoApi.getById(videoId);
 
         setStatus({
           status: data.status,
@@ -41,14 +37,14 @@ export default function Home() {
         });
 
         if (data.status === 'completed') {
-          setHighlights(data.highlights.map((h: any) => ({
+          setHighlights(data.highlights.map((h) => ({
             id: h.id,
             startTime: h.start_time,
             endTime: h.end_time,
             title: h.title,
-            description: h.description,
+            description: h.description || '',
             score: h.score,
-            thumbnailUrl: h.thumbnail_url,
+            thumbnailUrl: h.thumbnail_url || undefined,
           })));
         } else if (data.status === 'error') {
           return;
@@ -57,10 +53,15 @@ export default function Home() {
           setTimeout(poll, 2000);
         }
       } catch (error) {
+        const message = error instanceof ApiRequestError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Unknown error';
         setStatus({
           status: 'error',
           progress: 0,
-          message: error instanceof Error ? error.message : 'Unknown error',
+          message,
         });
       }
     };
@@ -75,25 +76,18 @@ export default function Home() {
     setStatus({ status: 'uploading', progress: 0, message: 'Uploading video...' });
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch(`${API_URL}/api/videos/upload`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-
-      const data = await response.json();
+      const data = await videoApi.upload(file);
       pollVideoStatus(data.id);
     } catch (error) {
+      const message = error instanceof ApiRequestError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : 'Upload failed';
       setStatus({
         status: 'error',
         progress: 0,
-        message: error instanceof Error ? error.message : 'Upload failed',
+        message,
       });
     }
   };
@@ -105,23 +99,18 @@ export default function Home() {
     setStatus({ status: 'uploading', progress: 0, message: 'Processing YouTube URL...' });
 
     try {
-      const response = await fetch(`${API_URL}/api/videos/youtube`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      });
-
-      if (!response.ok) {
-        throw new Error('YouTube processing failed');
-      }
-
-      const data = await response.json();
+      const data = await videoApi.processYouTube(url);
       pollVideoStatus(data.id);
     } catch (error) {
+      const message = error instanceof ApiRequestError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : 'YouTube processing failed';
       setStatus({
         status: 'error',
         progress: 0,
-        message: error instanceof Error ? error.message : 'YouTube processing failed',
+        message,
       });
     }
   };
@@ -135,17 +124,9 @@ export default function Home() {
     console.log('Export highlight:', highlight.title);
 
     try {
-      const response = await fetch(`${API_URL}/api/highlights/${highlight.id}/export`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        throw new Error('Export failed');
-      }
-
-      const data = await response.json();
-      console.log('Export started:', data);
-      alert(`Export started! Job ID: ${data.export_id}`);
+      const response = await highlightApi.export(highlight.id);
+      console.log('Export started:', response.data);
+      alert(`Export started! Job ID: ${response.data.export_id}`);
     } catch (error) {
       console.error('Export error:', error);
       alert('Export failed');
