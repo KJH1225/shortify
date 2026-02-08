@@ -92,9 +92,9 @@ class TranscriptionService:
                 segments = []
                 for seg in (response.segments or []):
                     segments.append(TranscriptSegment(
-                        start=seg.get("start", seg.start) if hasattr(seg, "start") else seg["start"],
-                        end=seg.get("end", seg.end) if hasattr(seg, "end") else seg["end"],
-                        text=(seg.get("text", seg.text) if hasattr(seg, "text") else seg["text"]).strip(),
+                        start=seg.start,
+                        end=seg.end,
+                        text=seg.text.strip(),
                     ))
 
                 return TranscriptionResult(
