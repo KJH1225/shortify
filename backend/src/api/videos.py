@@ -86,6 +86,7 @@ async def upload_video(
         status=ProcessingStatus.UPLOADING,
     )
     await repo.update_status(video_id, ProcessingStatus.UPLOADING, 0, "업로드 중...")
+    await db.commit()
 
     # 백그라운드에서 처리
     background_tasks.add_task(processor.process_file, video_id, file)
@@ -124,6 +125,7 @@ async def process_youtube(
         status=ProcessingStatus.PROCESSING,
     )
     await repo.update_status(video_id, ProcessingStatus.PROCESSING, 0, "YouTube 영상 정보 가져오는 중...")
+    await db.commit()
 
     # 백그라운드에서 처리
     background_tasks.add_task(processor.process_youtube, video_id, request.url)

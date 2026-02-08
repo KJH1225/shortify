@@ -4,7 +4,7 @@ from models import HighlightResponse, ApiResponse, ApiError
 from infrastructure.database import get_db
 from infrastructure.repository import HighlightRepository, VideoRepository
 from services.export_processor import export_processor
-from core.config import settings
+from core.config import get_settings
 from pathlib import Path
 
 router = APIRouter()
@@ -76,10 +76,10 @@ async def export_highlight(
     # Determine video source path
     video_path = None
     if video.source_type == "file" and video.source_filename:
-        video_path = str(Path(settings.upload_dir) / video.source_filename)
+        video_path = str(Path(get_settings().upload_dir) / video.source_filename)
     elif video.source_type == "youtube" and video.source_url:
         # For YouTube videos, we need to download first (simplified path)
-        video_path = str(Path(settings.upload_dir) / f"{video.id}.mp4")
+        video_path = str(Path(get_settings().upload_dir) / f"{video.id}.mp4")
 
     # Create export job
     job = await export_processor.create_export_job(

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 from enum import Enum
 
-from core.config import settings
+from core.config import get_settings
 
 
 class ExportStatus(str, Enum):
@@ -49,7 +49,7 @@ class ExportProcessor:
     """Handles video export/clipping using FFmpeg"""
 
     def __init__(self):
-        self.output_dir = Path(settings.upload_dir) / "exports"
+        self.output_dir = Path(get_settings().upload_dir) / "exports"
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def _check_ffmpeg(self) -> bool:

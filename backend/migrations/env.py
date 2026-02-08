@@ -17,7 +17,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from infrastructure.database import Base
 from infrastructure.models import Video, Highlight  # noqa: F401
-from core.config import settings
+from core.config import get_settings
+
+settings = get_settings()
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
