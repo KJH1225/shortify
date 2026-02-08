@@ -2,8 +2,8 @@
 
 AI 기반 영상 하이라이트 자동 추출 및 숏폼 변환 서비스
 
-> **Version**: 0.1.0 (MVP)
-> **Match Rate**: 99% (PDCA 완료)
+> **Version**: 0.2.0
+> **Match Rate**: 100% (PDCA 완료)
 
 ## 주요 기능
 
@@ -11,7 +11,9 @@ AI 기반 영상 하이라이트 자동 추출 및 숏폼 변환 서비스
 |------|------|:----:|
 | Video Upload | 영상 파일 업로드 + 검증 | ✅ |
 | YouTube Processing | YouTube URL 영상 처리 | ✅ |
-| AI Highlight Extraction | 하이라이트 구간 자동 추출 | ✅ (Mock) |
+| AI Highlight Extraction | OpenAI Whisper + GPT 기반 하이라이트 자동 추출 | ✅ |
+| Video Player | HTTP Range Request 스트리밍 + 하이라이트 타임라인 | ✅ |
+| Video History | 과거 분석 영상 목록 조회, 재열기, 삭제 | ✅ |
 | Export to Short-form | FFmpeg 기반 영상 클리핑 | ✅ |
 | Real-time Status | 처리 상태 실시간 조회 | ✅ |
 
@@ -25,7 +27,7 @@ AI 기반 영상 하이라이트 자동 추출 및 숏폼 변환 서비스
 - **Zustand** (상태관리)
 
 ### Backend
-- **FastAPI** (Python 3.11+)
+- **FastAPI** (Python 3.13+)
 - **SQLAlchemy 2.0** (Async ORM)
 - **MySQL / SQLite**
 - **Alembic** (DB Migration)
@@ -40,7 +42,7 @@ AI 기반 영상 하이라이트 자동 추출 및 숏폼 변환 서비스
 ### 사전 요구사항
 
 - Node.js 20+
-- Python 3.11+
+- Python 3.13+
 - pnpm
 - FFmpeg
 - MySQL 8.0+ (또는 SQLite for development)
@@ -138,6 +140,7 @@ pnpm dev
 | POST | `/api/videos/youtube` | YouTube URL 처리 |
 | GET | `/api/videos/{id}` | 영상 정보 조회 |
 | GET | `/api/videos/` | 영상 목록 조회 |
+| GET | `/api/videos/{id}/stream` | 영상 스트리밍 (Range Request) |
 | DELETE | `/api/videos/{id}` | 영상 삭제 |
 
 ### Highlights API
@@ -159,11 +162,11 @@ pnpm dev
 shortify/
 ├── frontend/                 # Next.js 프론트엔드
 │   └── src/
-│       ├── app/              # App Router 페이지
+│       ├── app/              # App Router 페이지 (/, /history)
 │       ├── components/       # Atomic Design 컴포넌트
 │       │   ├── atoms/        # Logo
-│       │   ├── molecules/    # VideoUploader, HighlightCard, ProcessingStatus
-│       │   ├── organisms/    # Header, HighlightGrid
+│       │   ├── molecules/    # VideoUploader, HighlightCard, VideoHistoryCard, ProcessingStatus
+│       │   ├── organisms/    # Header, HighlightGrid, VideoPlayer
 │       │   ├── templates/    # MainLayout
 │       │   └── ui/           # shadcn/ui components
 │       ├── services/         # API Client Layer
@@ -174,7 +177,7 @@ shortify/
 ├── backend/                  # FastAPI 백엔드
 │   ├── src/
 │   │   ├── api/              # FastAPI Routes
-│   │   ├── services/         # Business Logic (Export Processor)
+│   │   ├── services/         # Business Logic (Transcription, Highlight, Export)
 │   │   ├── infrastructure/   # Database, Repository Pattern
 │   │   ├── models/           # Pydantic Schemas
 │   │   └── core/             # Config, Constants
@@ -203,7 +206,7 @@ shortify/
 |------|------|---------------|
 | Rate Limit Storage | In-memory | Redis |
 | Export Job Storage | In-memory | Redis/DB |
-| AI Highlight | Mock Data | OpenAI/Custom ML |
+| Large File Chunking | FFmpeg 기반 | 분산 처리 |
 | Authentication | None | JWT/OAuth |
 
 ## 향후 개선 사항
