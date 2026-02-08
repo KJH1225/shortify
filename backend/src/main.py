@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from collections import defaultdict
 import time
 from contextlib import asynccontextmanager
-from api import videos, highlights
+from api import videos, highlights, stream
 from infrastructure.database import init_db, close_db
 
 
@@ -69,6 +69,7 @@ app.add_middleware(
 # 라우터 등록
 app.include_router(videos.router, prefix="/api/videos", tags=["videos"])
 app.include_router(highlights.router, prefix="/api/highlights", tags=["highlights"])
+app.include_router(stream.router, prefix="/api", tags=["stream"])
 
 
 @app.get("/")

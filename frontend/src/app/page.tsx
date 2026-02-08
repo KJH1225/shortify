@@ -5,6 +5,7 @@ import { MainLayout } from '@/components/templates/MainLayout';
 import { VideoUploader } from '@/components/molecules/VideoUploader';
 import { ProcessingStatus } from '@/components/molecules/ProcessingStatus';
 import { HighlightGrid } from '@/components/organisms/HighlightGrid';
+import { VideoPlayer } from '@/components/organisms/VideoPlayer';
 import { useVideoStore } from '@/store/videoStore';
 import { videoApi, highlightApi, ApiRequestError } from '@/services/api';
 import type { Highlight } from '@/types';
@@ -12,11 +13,14 @@ import type { Highlight } from '@/types';
 export default function Home() {
   const { status, highlights, setStatus, setHighlights, reset } = useVideoStore();
   const [exportingHighlightId, setExportingHighlightId] = useState<number | null>(null);
+  const [currentVideoId, setCurrentVideoId] = useState<number | null>(null);
+  const [activeHighlight, setActiveHighlight] = useState<Highlight | null>(null);
+  const [showPlayer, setShowPlayer] = useState(false);
 
   const isProcessing = status.status === 'uploading' || status.status === 'processing';
 
   const pollVideoStatus = async (videoId: number) => {
-    const maxAttempts = 60;
+    const maxAttempts = 180;
     let attempts = 0;
 
     const poll = async () => {
@@ -39,6 +43,7 @@ export default function Home() {
         });
 
         if (data.status === 'completed') {
+          setCurrentVideoId(videoId);
           setHighlights(data.highlights.map((h) => ({
             id: h.id,
             startTime: h.start_time,
@@ -118,8 +123,13 @@ export default function Home() {
   };
 
   const handlePlay = (highlight: Highlight) => {
-    console.log('Play highlight:', highlight.title, `${highlight.startTime}s - ${highlight.endTime}s`);
-    // TODO: 영상 플레이어 연동
+    setActiveHighlight(highlight);
+    setShowPlayer(true);
+  };
+
+  const handleClosePlayer = () => {
+    setShowPlayer(false);
+    setActiveHighlight(null);
   };
 
   const handleExport = async (highlight: Highlight) => {
@@ -196,6 +206,17 @@ export default function Home() {
         {/* Processing Status */}
         {status.status !== 'idle' && (
           <ProcessingStatus status={status} />
+        )}
+
+        {/* Video Player */}
+        {showPlayer && currentVideoId && (
+          <VideoPlayer
+            videoUrl={videoApi.getStreamUrl(currentVideoId)}
+            highlights={highlights}
+            activeHighlight={activeHighlight}
+            onHighlightChange={setActiveHighlight}
+            onClose={handleClosePlayer}
+          />
         )}
 
         {/* Highlights Grid */}

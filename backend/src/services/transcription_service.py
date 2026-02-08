@@ -1,6 +1,8 @@
 """OpenAI Whisper API 기반 음성-텍스트 변환 서비스"""
 import asyncio
+import json
 import os
+import subprocess
 from dataclasses import dataclass, field
 from typing import Callable, Awaitable
 
@@ -109,28 +111,43 @@ class TranscriptionService:
                 await asyncio.sleep(self.retry_delay * (2 ** attempt))
 
     def _split_audio(self, audio_path: str, chunk_size_mb: int) -> list[str]:
-        """큰 오디오 파일을 청크로 분할 (pydub 사용)"""
-        from pydub import AudioSegment
-
-        audio = AudioSegment.from_wav(audio_path)
+        """큰 오디오 파일을 청크로 분할 (FFmpeg 사용, Python 3.13+ 호환)"""
+        # FFmpeg로 총 duration(초) 조회
+        probe = subprocess.run(
+            [
+                "ffprobe", "-v", "quiet", "-print_format", "json",
+                "-show_format", audio_path,
+            ],
+            capture_output=True, text=True,
+        )
+        duration_sec = float(json.loads(probe.stdout)["format"]["duration"])
 
         # 파일 크기 기준으로 청크 시간 계산
         file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
-        duration_ms = len(audio)
-        ms_per_mb = duration_ms / file_size_mb
-        chunk_duration_ms = int(ms_per_mb * chunk_size_mb)
+        sec_per_mb = duration_sec / file_size_mb
+        chunk_duration_sec = sec_per_mb * chunk_size_mb
 
         chunk_paths = []
         base_dir = os.path.dirname(audio_path)
         base_name = os.path.splitext(os.path.basename(audio_path))[0]
 
-        for i, start_ms in enumerate(range(0, duration_ms, chunk_duration_ms)):
-            end_ms = min(start_ms + chunk_duration_ms, duration_ms)
-            chunk = audio[start_ms:end_ms]
-
+        start_sec = 0.0
+        i = 0
+        while start_sec < duration_sec:
             chunk_path = os.path.join(base_dir, f"{base_name}_chunk_{i}.wav")
-            chunk.export(chunk_path, format="wav")
+            subprocess.run(
+                [
+                    "ffmpeg", "-y", "-i", audio_path,
+                    "-ss", str(start_sec),
+                    "-t", str(chunk_duration_sec),
+                    "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
+                    chunk_path,
+                ],
+                capture_output=True,
+            )
             chunk_paths.append(chunk_path)
+            start_sec += chunk_duration_sec
+            i += 1
 
         return chunk_paths
 

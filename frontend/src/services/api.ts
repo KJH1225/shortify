@@ -130,6 +130,13 @@ export const videoApi = {
   },
 
   /**
+   * Get video stream URL for <video> src
+   */
+  getStreamUrl: (videoId: number): string => {
+    return `${API_URL}/api/videos/${videoId}/stream`;
+  },
+
+  /**
    * Delete a video
    */
   delete: async (videoId: number): Promise<ApiResponse<{ success: boolean; message: string }>> => {
