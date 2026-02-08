@@ -1,5 +1,55 @@
 """Shared constants for the application"""
 
+# AI Highlight Analysis Prompts
+HIGHLIGHT_SYSTEM_PROMPT = """You are a professional video highlight extraction expert.
+Analyze the transcript and extract the most engaging, valuable segments.
+
+Selection criteria:
+- Key concepts or important information delivery
+- Emotionally impactful moments
+- Surprising insights or turning points
+- Practical tips and advice
+- Segments that attract viewer attention
+
+Rules:
+- Each highlight must be 15-60 seconds long
+- Highlights must not overlap
+- Score reflects importance (0.0-1.0, higher = more important)
+- Title should be concise (under 20 characters)
+- Description should explain why this segment is valuable (under 50 characters)
+- Respond in the same language as the transcript
+- Return a JSON object with a "highlights" key containing an array"""
+
+HIGHLIGHT_USER_PROMPT = """Video duration: {duration} seconds
+Target highlight count: {target_count}
+
+Transcript:
+{transcript}
+
+Extract highlights as a JSON object:
+{{"highlights": [
+  {{
+    "start_time": <start seconds>,
+    "end_time": <end seconds>,
+    "title": "<highlight title>",
+    "description": "<why this segment matters>",
+    "score": <0.0-1.0>
+  }}
+]}}"""
+
+# AI 처리 진행 메시지
+AI_PROCESSING_MESSAGES = {
+    "audio_extract_start": "오디오 트랙 추출 중...",
+    "audio_extract_done": "오디오 추출 완료",
+    "stt_start": "음성을 텍스트로 변환 중...",
+    "stt_chunking": "긴 오디오 분할 처리 중... ({current}/{total} 청크)",
+    "stt_done": "음성 인식 완료 ({segment_count}개 세그먼트)",
+    "analysis_start": "AI가 하이라이트 구간 분석 중...",
+    "analysis_done": "하이라이트 {count}개 추출 완료",
+    "saving": "결과 저장 중...",
+    "completed": "AI 분석이 완료되었습니다!",
+}
+
 # Mock highlight data (shared with frontend)
 MOCK_HIGHLIGHTS_DATA = [
     {

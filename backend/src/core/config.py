@@ -17,6 +17,19 @@ class Settings(BaseSettings):
 
     # OpenAI
     openai_api_key: str = ""
+    openai_whisper_model: str = "whisper-1"
+    openai_chat_model: str = "gpt-4o-mini"
+
+    # AI 분석 설정
+    audio_sample_rate: int = 16000
+    whisper_chunk_size_mb: int = 24
+    max_highlights: int = 10
+    ai_retry_count: int = 3
+    ai_retry_delay: float = 2.0
+
+    def has_openai_key(self) -> bool:
+        """OpenAI API 키가 설정되었는지 확인"""
+        return bool(self.openai_api_key and self.openai_api_key.strip())
 
     # 파일 업로드
     upload_dir: str = "./uploads"

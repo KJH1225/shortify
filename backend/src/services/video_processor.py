@@ -7,7 +7,10 @@ from infrastructure.database import async_session_maker
 from infrastructure.repository import VideoRepository, HighlightRepository
 from models import ProcessingStatus
 from core.config import get_settings
-from core.constants import MOCK_HIGHLIGHTS_DATA, PROCESSING_MESSAGES
+from core.constants import AI_PROCESSING_MESSAGES
+from services.audio_extractor import AudioExtractor
+from services.transcription_service import TranscriptionService
+from services.highlight_analyzer import HighlightAnalyzer
 
 
 class VideoProcessor:
@@ -15,6 +18,9 @@ class VideoProcessor:
 
     def __init__(self):
         self._download_progress: dict[int, int] = {}
+        self._audio_extractor = AudioExtractor()
+        self._transcription_service = TranscriptionService()
+        self._highlight_analyzer = HighlightAnalyzer()
 
     def _check_ytdlp(self) -> bool:
         """yt-dlp 설치 여부 확인"""
@@ -66,7 +72,7 @@ class VideoProcessor:
                 self._download_progress[video_id] = int((downloaded / total) * 70) + 10
 
     async def process_file(self, video_id: int, file):
-        """업로드된 파일 처리 - 디스크 저장 후 Mock 분석"""
+        """업로드된 파일 처리 - 디스크 저장 후 AI 분석"""
         try:
             upload_dir = Path(get_settings().upload_dir)
             upload_dir.mkdir(parents=True, exist_ok=True)
@@ -99,8 +105,8 @@ class VideoProcessor:
                 )
                 await db.commit()
 
-            # Step 4: Mock 분석
-            await self._simulate_analysis(video_id)
+            # Step 4: AI 분석
+            await self._analyze_video(video_id)
 
         except Exception as e:
             async with async_session_maker() as db:
@@ -114,7 +120,7 @@ class VideoProcessor:
             f.write(content)
 
     async def process_youtube(self, video_id: int, url: str):
-        """YouTube 영상 처리 - 실제 다운로드 후 Mock 분석"""
+        """YouTube 영상 처리 - 실제 다운로드 후 AI 분석"""
         try:
             # Step 1: yt-dlp 확인
             if not self._check_ytdlp():
@@ -177,8 +183,8 @@ class VideoProcessor:
                 )
                 await db.commit()
 
-            # Step 6: Mock 분석
-            await self._simulate_analysis(video_id)
+            # Step 6: AI 분석
+            await self._analyze_video(video_id)
 
         except Exception as e:
             self._download_progress.pop(video_id, None)
@@ -187,29 +193,157 @@ class VideoProcessor:
                 await repo.update_status(video_id, ProcessingStatus.ERROR, 0, str(e))
                 await db.commit()
 
-    async def _simulate_analysis(self, video_id: int):
-        """AI 분석 시뮬레이션 (Mock - 추후 실제 AI로 교체)"""
-        # Phase 1: 진행률 업데이트
-        async with async_session_maker() as db:
-            repo = VideoRepository(db)
-            for i, msg in enumerate(PROCESSING_MESSAGES):
-                progress = 80 + (i * 3)  # 80~92 범위
-                await repo.update_status(video_id, ProcessingStatus.PROCESSING, progress, msg)
+    async def _analyze_video(self, video_id: int):
+        """실제 AI 분석 파이프라인 (실패 시 오류 응답)"""
+        settings = get_settings()
+
+        if not settings.has_openai_key():
+            raise RuntimeError(
+                "OpenAI API 키가 설정되지 않았습니다. "
+                "환경변수 OPENAI_API_KEY를 설정해주세요."
+            )
+
+        # === Step 1: 오디오 추출 (10-20%) ===
+        await self._update_progress(
+            video_id, 10, AI_PROCESSING_MESSAGES["audio_extract_start"]
+        )
+
+        video_path = self._get_video_path(video_id)
+        audio_path = self._get_audio_path(video_id)
+
+        await self._audio_extractor.extract(video_path, audio_path)
+
+        await self._update_progress(
+            video_id, 20, AI_PROCESSING_MESSAGES["audio_extract_done"]
+        )
+
+        try:
+            # === Step 2: STT (20-50%) ===
+            await self._update_progress(
+                video_id, 25, AI_PROCESSING_MESSAGES["stt_start"]
+            )
+
+            async def stt_progress_callback(msg: str):
+                await self._update_progress(video_id, -1, msg)
+
+            transcript = await self._transcription_service.transcribe(
+                audio_path,
+                on_progress=stt_progress_callback,
+            )
+
+            await self._update_progress(
+                video_id, 50,
+                AI_PROCESSING_MESSAGES["stt_done"].format(
+                    segment_count=len(transcript.segments)
+                ),
+            )
+
+            # === Step 3: 하이라이트 분석 (50-90%) ===
+            await self._update_progress(
+                video_id, 55, AI_PROCESSING_MESSAGES["analysis_start"]
+            )
+
+            duration = await self._get_video_duration(video_id)
+            highlights = await self._highlight_analyzer.analyze(transcript, duration)
+
+            await self._update_progress(
+                video_id, 90,
+                AI_PROCESSING_MESSAGES["analysis_done"].format(
+                    count=len(highlights)
+                ),
+            )
+
+            # === Step 4: DB 저장 (90-100%) ===
+            await self._update_progress(
+                video_id, 92, AI_PROCESSING_MESSAGES["saving"]
+            )
+
+            highlights_data = [
+                {
+                    "start_time": h.start_time,
+                    "end_time": h.end_time,
+                    "title": h.title,
+                    "description": h.description,
+                    "score": h.score,
+                }
+                for h in highlights
+            ]
+
+            async with async_session_maker() as db:
+                highlight_repo = HighlightRepository(db)
+                await highlight_repo.create_batch(video_id, highlights_data)
                 await db.commit()
-                await asyncio.sleep(0.8)
 
-        # Phase 2: 하이라이트 생성 (독립 세션, 즉시 commit)
-        async with async_session_maker() as db:
-            highlight_repo = HighlightRepository(db)
-            await highlight_repo.create_batch(video_id, MOCK_HIGHLIGHTS_DATA)
-            await db.commit()
+            # === 완료 ===
+            async with async_session_maker() as db:
+                repo = VideoRepository(db)
+                await repo.update_status(
+                    video_id, ProcessingStatus.COMPLETED, 100,
+                    AI_PROCESSING_MESSAGES["completed"],
+                )
+                await db.commit()
 
-        # Phase 3: 최종 상태 업데이트 (독립 세션)
+        finally:
+            # 임시 오디오 파일 정리
+            self._cleanup_audio(audio_path)
+
+    def _get_video_path(self, video_id: int) -> str:
+        """영상 파일 경로 결정"""
+        upload_dir = Path(get_settings().upload_dir)
+
+        # YouTube: {video_id}.mp4
+        mp4_path = upload_dir / f"{video_id}.mp4"
+        if mp4_path.exists():
+            return str(mp4_path)
+
+        # File upload: {video_id}_{filename} 패턴 검색
+        for f in upload_dir.iterdir():
+            if f.name.startswith(f"{video_id}_") and f.is_file():
+                return str(f)
+
+        raise FileNotFoundError(
+            f"영상 파일을 찾을 수 없습니다: video_id={video_id}"
+        )
+
+    def _get_audio_path(self, video_id: int) -> str:
+        """오디오 출력 경로"""
+        upload_dir = Path(get_settings().upload_dir)
+        return str(upload_dir / "audio" / f"{video_id}.wav")
+
+    async def _get_video_duration(self, video_id: int) -> float:
+        """DB에서 영상 길이 조회"""
         async with async_session_maker() as db:
             repo = VideoRepository(db)
-            # duration이 아직 설정되지 않은 경우에만 Mock 값 사용
             video = await repo.get_by_id(video_id)
-            if video and not video.duration:
-                await repo.update_duration(video_id, 600.0)  # 10분 (Mock)
-            await repo.update_status(video_id, ProcessingStatus.COMPLETED, 100, "분석이 완료되었습니다!")
+            if video and video.duration:
+                return video.duration
+        return 600.0  # duration 없으면 기본값 10분
+
+    async def _update_progress(self, video_id: int, progress: int, message: str):
+        """DB 진행률 업데이트 (progress=-1이면 메시지만 변경)"""
+        async with async_session_maker() as db:
+            repo = VideoRepository(db)
+            if progress >= 0:
+                await repo.update_status(
+                    video_id, ProcessingStatus.PROCESSING, progress, message
+                )
+            else:
+                video = await repo.get_by_id(video_id)
+                if video:
+                    video.message = message
+                    video.updated_at = datetime.now()
+                    await db.flush()
             await db.commit()
+
+    def _cleanup_audio(self, audio_path: str):
+        """임시 오디오 파일 및 청크 삭제"""
+        if os.path.exists(audio_path):
+            os.remove(audio_path)
+
+        # 청크 파일도 정리
+        audio_dir = os.path.dirname(audio_path)
+        base_name = os.path.splitext(os.path.basename(audio_path))[0]
+        if os.path.exists(audio_dir):
+            for f in os.listdir(audio_dir):
+                if f.startswith(f"{base_name}_chunk_"):
+                    os.remove(os.path.join(audio_dir, f))
