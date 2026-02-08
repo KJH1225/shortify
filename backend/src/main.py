@@ -11,7 +11,7 @@ from infrastructure.database import init_db, close_db
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """애플리케이션 라이프사이클 관리"""
-    # Startup: DB 초기화
+    # Startup: DB 연결 확인 (스키마는 Alembic으로 관리)
     await init_db()
     yield
     # Shutdown: DB 연결 종료

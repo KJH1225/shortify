@@ -1,4 +1,5 @@
 """Database connection and session management"""
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from core.config import get_settings
@@ -49,9 +50,12 @@ async def get_db() -> AsyncSession:
 
 
 async def init_db():
-    """Initialize database tables"""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """Verify database connection on startup.
+    Schema management is handled by Alembic migrations.
+    Run: cd backend && alembic upgrade head
+    """
+    async with engine.connect() as conn:
+        await conn.execute(text("SELECT 1"))
 
 
 async def close_db():

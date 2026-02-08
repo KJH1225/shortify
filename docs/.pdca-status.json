@@ -1,24 +1,15 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-02-08T13:03:44.547Z",
-  "activeFeatures": [
-    "core",
-    "infrastructure",
-    "backend",
-    "api",
-    "video_processor.py",
-    "export_processor.py",
-    "api.ts",
-    "frontend",
-    "organisms",
-    "store"
-  ],
+  "lastUpdated": "2026-02-08T22:30:00.000Z",
+  "activeFeatures": [],
   "completedFeatures": [
     "transaction-bugfix",
     "highlight-download",
-    "youtube-download"
+    "youtube-download",
+    "core",
+    "alembic-migration-sync"
   ],
-  "primaryFeature": "youtube-download",
+  "primaryFeature": null,
   "features": {
     "transaction-bugfix": {
       "phase": "completed",
@@ -40,13 +31,6 @@
         "completedAt": "2026-02-08T10:45:00.000Z",
         "lastUpdated": "2026-02-08T10:45:00.000Z"
       },
-      "files": [
-        "infrastructure/database.py",
-        "api/videos.py",
-        "api/highlights.py",
-        "services/video_processor.py",
-        "services/export_processor.py"
-      ],
       "verification": {
         "totalItems": 19,
         "passedItems": 19,
@@ -56,35 +40,21 @@
       }
     },
     "highlight-download": {
-      "phase": "check",
-      "phaseNumber": 4,
+      "phase": "completed",
+      "phaseNumber": 5,
       "matchRate": 99,
       "iterationCount": 0,
-      "status": "Gap Analysis Complete - Ready for Report",
+      "status": "Complete",
       "description": "Highlight export download feature - backend FileResponse endpoint + frontend polling/auto-download",
-      "requirements": [
-        "Backend download endpoint (GET /api/highlights/{id}/export/{export_id}/download)",
-        "FileResponse with video/mp4 media type",
-        "404/409 error handling with ApiError",
-        "Frontend polling + auto-download flow",
-        "HighlightCard isExporting loading UI"
-      ],
       "documents": {
         "plan": "docs/01-plan/features/highlight-download.plan.md",
         "design": "docs/02-design/features/highlight-download.design.md"
       },
       "timestamps": {
         "started": "2026-02-08T11:00:00.000Z",
+        "completedAt": "2026-02-08T12:30:00.000Z",
         "lastUpdated": "2026-02-08T12:30:00.000Z"
       },
-      "files": [
-        "backend/src/api/highlights.py",
-        "backend/src/services/export_processor.py",
-        "frontend/src/services/api.ts",
-        "frontend/src/app/page.tsx",
-        "frontend/src/components/organisms/HighlightGrid.tsx",
-        "frontend/src/components/molecules/HighlightCard.tsx"
-      ],
       "verification": {
         "totalItems": 7,
         "passedItems": 7,
@@ -100,13 +70,6 @@
       "iterationCount": 0,
       "status": "Complete",
       "description": "YouTube 영상 실제 다운로드 (yt-dlp) 및 파일 업로드 디스크 저장 구현",
-      "requirements": [
-        "YT-1: yt-dlp YouTube 다운로드 → uploads/{video_id}.mp4",
-        "YT-2: YouTube 메타정보 (제목, duration) DB 반영",
-        "YT-3: yt-dlp 미설치 시 ERROR 처리",
-        "UP-1: 파일 업로드 → uploads/{video_id}_{filename} 디스크 저장",
-        "UP-2: asyncio.to_thread 비동기 래핑"
-      ],
       "documents": {
         "plan": "docs/01-plan/features/youtube-download.plan.md",
         "design": "docs/02-design/features/youtube-download.design.md",
@@ -117,10 +80,6 @@
         "completedAt": "2026-02-08T12:30:00.000Z",
         "lastUpdated": "2026-02-08T12:30:00.000Z"
       },
-      "files": [
-        "backend/requirements.txt",
-        "backend/src/services/video_processor.py"
-      ],
       "verification": {
         "totalItems": 8,
         "passedItems": 8,
@@ -129,135 +88,72 @@
         "verified": true
       }
     },
-    "core": {
-      "phase": "do",
-      "phaseNumber": 3,
-      "matchRate": null,
+    "alembic-migration-sync": {
+      "phase": "completed",
+      "phaseNumber": 5,
+      "matchRate": 100,
       "iterationCount": 0,
-      "requirements": [],
-      "documents": {},
+      "status": "Complete",
+      "description": "Alembic 마이그레이션과 ORM 모델 동기화 - 마이그레이션 재작성, 인덱스 추가, create_all 제거",
+      "requirements": [
+        "M-1~M-4: 마이그레이션 파일 ORM 기준 재작성 (INT UNSIGNED PK)",
+        "I-1~I-4: 인덱스 추가 (status, created_at, video_id, score)",
+        "S-1~S-2: create_all 제거, Alembic 기반 스키마 관리로 전환",
+        "A-1~A-2: Alembic 설정 및 비동기 MySQL 호환 확인"
+      ],
+      "documents": {
+        "plan": "docs/01-plan/features/alembic-migration-sync.plan.md",
+        "design": "docs/02-design/features/alembic-migration-sync.design.md",
+        "analysis": "docs/03-analysis/features/alembic-migration-sync.analysis.md",
+        "report": "docs/04-report/alembic-migration-sync.report.md"
+      },
+      "timestamps": {
+        "started": "2026-02-08T14:30:00.000Z",
+        "lastUpdated": "2026-02-08T14:55:00.000Z"
+      },
+      "verification": {
+        "totalItems": 10,
+        "passedItems": 7,
+        "skippedItems": 3,
+        "failedItems": 0,
+        "matchRate": 100,
+        "verified": true
+      }
+    },
+    "core": {
+      "phase": "completed",
+      "phaseNumber": 5,
+      "matchRate": 100,
+      "iterationCount": 0,
+      "status": "Complete",
+      "description": "MySQL Enum 불일치 수정 + PK를 INT UNSIGNED AUTO_INCREMENT로 변경 (UUID → auto-increment)",
+      "requirements": [
+        "C1: SQLEnum에 values_callable 추가 (소문자 .value 사용)",
+        "R1-R3: Video.id, Highlight.id → INT UNSIGNED AUTO_INCREMENT, FK 타입 일치",
+        "R4: generate_uuid() 및 import uuid 제거",
+        "R5: VideoRepository.create()에서 video_id 파라미터 제거",
+        "R6-R7: 모든 video_id/highlight_id 타입 str → int",
+        "R8: API path 파라미터 7개 엔드포인트 int 변환",
+        "R9: Pydantic 스키마 id: int, video_id: int",
+        "R10: 프론트엔드 TypeScript 타입 string → number",
+        "R11: api/videos.py UUID 생성 완전 제거",
+        "R12: _download_progress: dict[int, int]"
+      ],
+      "documents": {
+        "report": "docs/04-report/core.report.md"
+      },
       "timestamps": {
         "started": "2026-02-08T12:43:21.163Z",
-        "lastUpdated": "2026-02-08T12:43:21.163Z"
+        "completedAt": "2026-02-08T22:30:00.000Z",
+        "lastUpdated": "2026-02-08T22:30:00.000Z"
       },
-      "lastFile": "/Users/hackersdevelop05/Desktop/web/shortify/backend/src/core/config.py"
-    },
-    "infrastructure": {
-      "phase": "do",
-      "phaseNumber": 3,
-      "matchRate": null,
-      "iterationCount": 0,
-      "requirements": [],
-      "documents": {},
-      "timestamps": {
-        "started": "2026-02-08T12:52:19.268Z",
-        "lastUpdated": "2026-02-08T13:01:42.483Z"
-      },
-      "lastFile": "/Users/hackersdevelop05/Desktop/web/shortify/backend/src/infrastructure/repository.py"
-    },
-    "backend": {
-      "phase": "do",
-      "phaseNumber": 3,
-      "matchRate": null,
-      "iterationCount": 0,
-      "requirements": [],
-      "documents": {},
-      "timestamps": {
-        "started": "2026-02-08T13:01:19.786Z",
-        "lastUpdated": "2026-02-08T13:01:20.778Z"
-      },
-      "lastFile": "/Users/hackersdevelop05/Desktop/web/shortify/backend/src/models/schemas.py"
-    },
-    "api": {
-      "phase": "do",
-      "phaseNumber": 3,
-      "matchRate": null,
-      "iterationCount": 0,
-      "requirements": [],
-      "documents": {},
-      "timestamps": {
-        "started": "2026-02-08T13:01:48.051Z",
-        "lastUpdated": "2026-02-08T13:02:04.216Z"
-      },
-      "lastFile": "/Users/hackersdevelop05/Desktop/web/shortify/backend/src/api/highlights.py"
-    },
-    "video_processor.py": {
-      "phase": "do",
-      "phaseNumber": 3,
-      "matchRate": null,
-      "iterationCount": 0,
-      "requirements": [],
-      "documents": {},
-      "timestamps": {
-        "started": "2026-02-08T13:02:05.149Z",
-        "lastUpdated": "2026-02-08T13:02:09.633Z"
-      },
-      "lastFile": "/Users/hackersdevelop05/Desktop/web/shortify/backend/src/services/video_processor.py"
-    },
-    "export_processor.py": {
-      "phase": "do",
-      "phaseNumber": 3,
-      "matchRate": null,
-      "iterationCount": 0,
-      "requirements": [],
-      "documents": {},
-      "timestamps": {
-        "started": "2026-02-08T13:02:13.478Z",
-        "lastUpdated": "2026-02-08T13:02:13.478Z"
-      },
-      "lastFile": "/Users/hackersdevelop05/Desktop/web/shortify/backend/src/services/export_processor.py"
-    },
-    "api.ts": {
-      "phase": "do",
-      "phaseNumber": 3,
-      "matchRate": null,
-      "iterationCount": 0,
-      "requirements": [],
-      "documents": {},
-      "timestamps": {
-        "started": "2026-02-08T13:02:52.857Z",
-        "lastUpdated": "2026-02-08T13:02:57.205Z"
-      },
-      "lastFile": "/Users/hackersdevelop05/Desktop/web/shortify/frontend/src/services/api.ts"
-    },
-    "frontend": {
-      "phase": "do",
-      "phaseNumber": 3,
-      "matchRate": null,
-      "iterationCount": 0,
-      "requirements": [],
-      "documents": {},
-      "timestamps": {
-        "started": "2026-02-08T13:03:16.977Z",
-        "lastUpdated": "2026-02-08T13:03:20.496Z"
-      },
-      "lastFile": "/Users/hackersdevelop05/Desktop/web/shortify/frontend/src/app/page.tsx"
-    },
-    "organisms": {
-      "phase": "do",
-      "phaseNumber": 3,
-      "matchRate": null,
-      "iterationCount": 0,
-      "requirements": [],
-      "documents": {},
-      "timestamps": {
-        "started": "2026-02-08T13:03:28.788Z",
-        "lastUpdated": "2026-02-08T13:03:28.788Z"
-      },
-      "lastFile": "/Users/hackersdevelop05/Desktop/web/shortify/frontend/src/components/organisms/HighlightGrid.tsx"
-    },
-    "store": {
-      "phase": "do",
-      "phaseNumber": 3,
-      "matchRate": null,
-      "iterationCount": 0,
-      "requirements": [],
-      "documents": {},
-      "timestamps": {
-        "started": "2026-02-08T13:03:44.547Z",
-        "lastUpdated": "2026-02-08T13:03:44.547Z"
-      },
-      "lastFile": "/Users/hackersdevelop05/Desktop/web/shortify/frontend/src/store/videoStore.ts"
+      "verification": {
+        "totalItems": 13,
+        "passedItems": 13,
+        "failedItems": 0,
+        "matchRate": 100,
+        "verified": true
+      }
     }
   },
   "pipeline": {
@@ -281,13 +177,19 @@
         "feature": "transaction-bugfix",
         "phase": "act",
         "status": "completed"
+      },
+      {
+        "timestamp": "2026-02-08T13:15:00.000Z",
+        "feature": "core",
+        "phase": "check",
+        "status": "completed"
       }
     ]
   },
   "session": {
     "startedAt": "2026-02-07T15:04:20.179Z",
     "onboardingCompleted": true,
-    "lastActivity": "2026-02-08T13:03:44.547Z"
+    "lastActivity": "2026-02-08T13:27:53.385Z"
   },
   "history": [
     {
@@ -295,36 +197,6 @@
       "feature": "transaction-bugfix",
       "phase": "do",
       "action": "implementation_started"
-    },
-    {
-      "timestamp": "2026-02-08T09:10:43.856Z",
-      "feature": "transaction-bugfix",
-      "phase": "do",
-      "action": "database.py_updated"
-    },
-    {
-      "timestamp": "2026-02-08T09:10:48.889Z",
-      "feature": "transaction-bugfix",
-      "phase": "do",
-      "action": "videos.py_updated"
-    },
-    {
-      "timestamp": "2026-02-08T09:10:53.456Z",
-      "feature": "transaction-bugfix",
-      "phase": "do",
-      "action": "highlights.py_updated"
-    },
-    {
-      "timestamp": "2026-02-08T09:11:04.686Z",
-      "feature": "transaction-bugfix",
-      "phase": "do",
-      "action": "video_processor.py_updated"
-    },
-    {
-      "timestamp": "2026-02-08T09:11:20.129Z",
-      "feature": "transaction-bugfix",
-      "phase": "do",
-      "action": "export_processor.py_updated"
     },
     {
       "timestamp": "2026-02-08T09:17:43.621Z",
@@ -341,316 +213,46 @@
       "reportPath": "docs/04-report/transaction-bugfix.report.md"
     },
     {
-      "timestamp": "2026-02-08T11:58:54.661Z",
-      "feature": "api",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T11:59:02.164Z",
-      "feature": "api",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T11:59:14.775Z",
-      "feature": "export_processor.py",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T11:59:28.996Z",
-      "feature": "api.ts",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T11:59:35.996Z",
-      "feature": "api.ts",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T11:59:53.858Z",
-      "feature": "frontend",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T12:00:01.566Z",
-      "feature": "frontend",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T12:00:06.297Z",
-      "feature": "frontend",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T12:00:11.541Z",
-      "feature": "organisms",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T12:00:16.035Z",
-      "feature": "organisms",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T12:00:23.610Z",
-      "feature": "molecules",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T12:00:28.299Z",
-      "feature": "molecules",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T12:00:33.014Z",
-      "feature": "molecules",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T12:00:39.768Z",
-      "feature": "molecules",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T12:04:59.555Z",
-      "feature": "highlight-download - Gap 분석",
-      "phase": "act",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T12:22:00.740Z",
-      "feature": "video_processor.py",
-      "phase": "do",
-      "action": "updated"
+      "timestamp": "2026-02-08T12:05:00.000Z",
+      "feature": "highlight-download",
+      "phase": "check",
+      "action": "gap_analysis_completed",
+      "matchRate": 99
     },
     {
       "timestamp": "2026-02-08T12:25:39.378Z",
-      "feature": "youtube-download - Gap 분석",
+      "feature": "youtube-download",
+      "phase": "check",
+      "action": "gap_analysis_completed",
+      "matchRate": 100
+    },
+    {
+      "timestamp": "2026-02-08T12:30:00.000Z",
+      "feature": "youtube-download",
       "phase": "act",
-      "action": "updated"
+      "action": "completion_report_generated",
+      "reportPath": "docs/04-report/youtube-download.report.md"
     },
     {
-      "timestamp": "2026-02-08T12:43:21.163Z",
+      "timestamp": "2026-02-08T13:15:00.000Z",
       "feature": "core",
-      "phase": "do",
-      "action": "updated"
+      "phase": "check",
+      "action": "gap_analysis_completed",
+      "matchRate": 100
     },
     {
-      "timestamp": "2026-02-08T12:52:19.268Z",
-      "feature": "infrastructure",
-      "phase": "do",
-      "action": "updated"
+      "timestamp": "2026-02-08T22:30:00.000Z",
+      "feature": "core",
+      "phase": "act",
+      "action": "completion_report_generated",
+      "reportPath": "docs/04-report/core.report.md"
     },
     {
-      "timestamp": "2026-02-08T13:01:18.257Z",
-      "feature": "infrastructure",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:01:19.786Z",
-      "feature": "backend",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:01:20.778Z",
-      "feature": "backend",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:01:27.997Z",
-      "feature": "infrastructure",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:01:29.220Z",
-      "feature": "infrastructure",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:01:30.456Z",
-      "feature": "infrastructure",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:01:31.671Z",
-      "feature": "infrastructure",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:01:32.773Z",
-      "feature": "infrastructure",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:01:37.386Z",
-      "feature": "infrastructure",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:01:38.717Z",
-      "feature": "infrastructure",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:01:39.707Z",
-      "feature": "infrastructure",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:01:41.014Z",
-      "feature": "infrastructure",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:01:42.483Z",
-      "feature": "infrastructure",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:01:48.052Z",
-      "feature": "api",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:01:53.027Z",
-      "feature": "api",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:01:56.622Z",
-      "feature": "api",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:01:58.191Z",
-      "feature": "api",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:01:59.977Z",
-      "feature": "api",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:02:04.216Z",
-      "feature": "api",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:02:05.149Z",
-      "feature": "video_processor.py",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:02:09.633Z",
-      "feature": "video_processor.py",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:02:13.478Z",
-      "feature": "export_processor.py",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:02:52.857Z",
-      "feature": "api.ts",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:02:54.024Z",
-      "feature": "api.ts",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:02:55.299Z",
-      "feature": "api.ts",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:02:56.173Z",
-      "feature": "api.ts",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:02:57.205Z",
-      "feature": "api.ts",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:03:16.977Z",
-      "feature": "frontend",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:03:18.003Z",
-      "feature": "frontend",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:03:19.336Z",
-      "feature": "frontend",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:03:20.496Z",
-      "feature": "frontend",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:03:28.788Z",
-      "feature": "organisms",
-      "phase": "do",
-      "action": "updated"
-    },
-    {
-      "timestamp": "2026-02-08T13:03:44.547Z",
-      "feature": "store",
-      "phase": "do",
-      "action": "updated"
+      "timestamp": "2026-02-08T22:30:00.000Z",
+      "feature": "cleanup",
+      "phase": "act",
+      "action": "removed_stale_features",
+      "removed": ["infrastructure", "migrations", "backend"]
     }
   ]
 }

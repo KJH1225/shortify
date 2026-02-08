@@ -24,11 +24,12 @@ class Video(Base):
         SQLEnum(ProcessingStatus, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=ProcessingStatus.IDLE,
+        index=True,
     )
     progress = Column(Integer, default=0)
     message = Column(Text, default="")
 
-    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False, index=True)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     # Relationships
@@ -43,13 +44,13 @@ class Highlight(Base):
     __tablename__ = "highlights"
 
     id = Column(MySQLInteger(unsigned=True), primary_key=True, autoincrement=True)
-    video_id = Column(MySQLInteger(unsigned=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False)
+    video_id = Column(MySQLInteger(unsigned=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False, index=True)
 
     start_time = Column(Float, nullable=False)
     end_time = Column(Float, nullable=False)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    score = Column(Float, nullable=False)
+    score = Column(Float, nullable=False, index=True)
     thumbnail_url = Column(String(512), nullable=True)
 
     created_at = Column(DateTime, default=datetime.now, nullable=False)

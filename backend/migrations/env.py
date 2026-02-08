@@ -15,6 +15,10 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+# Load .env from backend/ directory (Alembic runs from backend/, not backend/src/)
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent.parent / ".env")
+
 from infrastructure.database import Base
 from infrastructure.models import Video, Highlight  # noqa: F401
 from core.config import get_settings
