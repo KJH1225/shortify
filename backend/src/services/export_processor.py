@@ -24,7 +24,7 @@ class ExportJob:
     def __init__(
         self,
         export_id: str,
-        highlight_id: str,
+        highlight_id: int,
         video_path: str,
         start_time: float,
         end_time: float,
@@ -66,7 +66,7 @@ class ExportProcessor:
 
     async def create_export_job(
         self,
-        highlight_id: str,
+        highlight_id: int,
         video_path: str,
         start_time: float,
         end_time: float,

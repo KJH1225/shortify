@@ -27,12 +27,12 @@ class HighlightBase(BaseModel):
 
 
 class HighlightCreate(HighlightBase):
-    video_id: str
+    video_id: int
 
 
 class HighlightResponse(HighlightBase):
-    id: str
-    video_id: str
+    id: int
+    video_id: int
     created_at: datetime
 
 
@@ -41,7 +41,7 @@ class VideoCreate(BaseModel):
 
 
 class VideoResponse(BaseModel):
-    id: str
+    id: int
     title: str
     source: VideoSource
     duration: float | None

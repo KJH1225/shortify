@@ -14,7 +14,7 @@ class VideoProcessor:
     """영상 처리 서비스"""
 
     def __init__(self):
-        self._download_progress: dict[str, int] = {}
+        self._download_progress: dict[int, int] = {}
 
     def _check_ytdlp(self) -> bool:
         """yt-dlp 설치 여부 확인"""
@@ -41,7 +41,7 @@ class VideoProcessor:
                 "thumbnail": info.get("thumbnail"),
             }
 
-    def _download_youtube(self, url: str, output_path: str, video_id: str):
+    def _download_youtube(self, url: str, output_path: str, video_id: int):
         """YouTube 영상 다운로드 (동기, asyncio.to_thread로 호출)"""
         import yt_dlp
 
@@ -57,7 +57,7 @@ class VideoProcessor:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
-    def _on_download_progress(self, d: dict, video_id: str):
+    def _on_download_progress(self, d: dict, video_id: int):
         """yt-dlp 다운로드 진행률 콜백 (동기 컨텍스트에서 실행)"""
         if d["status"] == "downloading":
             total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
@@ -65,7 +65,7 @@ class VideoProcessor:
             if total > 0:
                 self._download_progress[video_id] = int((downloaded / total) * 70) + 10
 
-    async def process_file(self, video_id: str, file):
+    async def process_file(self, video_id: int, file):
         """업로드된 파일 처리 - 디스크 저장 후 Mock 분석"""
         try:
             upload_dir = Path(get_settings().upload_dir)
@@ -113,7 +113,7 @@ class VideoProcessor:
         with open(path, "wb") as f:
             f.write(content)
 
-    async def process_youtube(self, video_id: str, url: str):
+    async def process_youtube(self, video_id: int, url: str):
         """YouTube 영상 처리 - 실제 다운로드 후 Mock 분석"""
         try:
             # Step 1: yt-dlp 확인
@@ -187,7 +187,7 @@ class VideoProcessor:
                 await repo.update_status(video_id, ProcessingStatus.ERROR, 0, str(e))
                 await db.commit()
 
-    async def _simulate_analysis(self, video_id: str):
+    async def _simulate_analysis(self, video_id: int):
         """AI 분석 시뮬레이션 (Mock - 추후 실제 AI로 교체)"""
         # Phase 1: 진행률 업데이트
         async with async_session_maker() as db:

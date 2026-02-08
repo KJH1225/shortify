@@ -18,7 +18,7 @@ export interface ApiError {
 }
 
 export interface VideoResponse {
-  id: string;
+  id: number;
   title: string;
   source: {
     type: 'file' | 'youtube';
@@ -35,8 +35,8 @@ export interface VideoResponse {
 }
 
 export interface HighlightResponse {
-  id: string;
-  video_id: string;
+  id: number;
+  video_id: number;
   start_time: number;
   end_time: number;
   title: string;
@@ -56,7 +56,7 @@ export interface ExportResponse {
 
 export interface ExportStatusResponse {
   export_id: string;
-  highlight_id: string;
+  highlight_id: number;
   status: 'pending' | 'processing' | 'completed' | 'error';
   download_url: string | null;
   error_message: string | null;
@@ -116,7 +116,7 @@ export const videoApi = {
   /**
    * Get video by ID
    */
-  getById: async (videoId: string): Promise<VideoResponse> => {
+  getById: async (videoId: number): Promise<VideoResponse> => {
     const response = await fetch(`${API_URL}/api/videos/${videoId}`);
     return handleResponse<VideoResponse>(response);
   },
@@ -132,7 +132,7 @@ export const videoApi = {
   /**
    * Delete a video
    */
-  delete: async (videoId: string): Promise<ApiResponse<{ success: boolean; message: string }>> => {
+  delete: async (videoId: number): Promise<ApiResponse<{ success: boolean; message: string }>> => {
     const response = await fetch(`${API_URL}/api/videos/${videoId}`, {
       method: 'DELETE',
     });
@@ -145,7 +145,7 @@ export const highlightApi = {
   /**
    * Get highlight by ID
    */
-  getById: async (highlightId: string): Promise<HighlightResponse> => {
+  getById: async (highlightId: number): Promise<HighlightResponse> => {
     const response = await fetch(`${API_URL}/api/highlights/${highlightId}`);
     return handleResponse<HighlightResponse>(response);
   },
@@ -153,7 +153,7 @@ export const highlightApi = {
   /**
    * Export highlight to short-form video
    */
-  export: async (highlightId: string): Promise<ApiResponse<ExportResponse>> => {
+  export: async (highlightId: number): Promise<ApiResponse<ExportResponse>> => {
     const response = await fetch(`${API_URL}/api/highlights/${highlightId}/export`, {
       method: 'POST',
     });
@@ -163,7 +163,7 @@ export const highlightApi = {
   /**
    * Get export job status
    */
-  getExportStatus: async (highlightId: string, exportId: string): Promise<ApiResponse<ExportStatusResponse>> => {
+  getExportStatus: async (highlightId: number, exportId: string): Promise<ApiResponse<ExportStatusResponse>> => {
     const response = await fetch(`${API_URL}/api/highlights/${highlightId}/export/${exportId}/status`);
     return handleResponse(response);
   },
@@ -171,7 +171,7 @@ export const highlightApi = {
   /**
    * Download exported highlight clip
    */
-  downloadExport: (highlightId: string, exportId: string): void => {
+  downloadExport: (highlightId: number, exportId: string): void => {
     const url = `${API_URL}/api/highlights/${highlightId}/export/${exportId}/download`;
     const a = document.createElement('a');
     a.href = url;
@@ -184,7 +184,7 @@ export const highlightApi = {
   /**
    * Delete a highlight
    */
-  delete: async (highlightId: string): Promise<ApiResponse<{ success: boolean; message: string }>> => {
+  delete: async (highlightId: number): Promise<ApiResponse<{ success: boolean; message: string }>> => {
     const response = await fetch(`${API_URL}/api/highlights/${highlightId}`, {
       method: 'DELETE',
     });

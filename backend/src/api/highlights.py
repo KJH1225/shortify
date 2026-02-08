@@ -13,7 +13,7 @@ router = APIRouter()
 
 
 @router.get("/{highlight_id}", response_model=HighlightResponse)
-async def get_highlight(highlight_id: str, db: AsyncSession = Depends(get_db)):
+async def get_highlight(highlight_id: int, db: AsyncSession = Depends(get_db)):
     """하이라이트 상세 조회"""
     repo = HighlightRepository(db)
     highlight = await repo.get_by_id(highlight_id)
@@ -43,7 +43,7 @@ async def get_highlight(highlight_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.post("/{highlight_id}/export")
 async def export_highlight(
-    highlight_id: str,
+    highlight_id: int,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
@@ -115,7 +115,7 @@ async def export_highlight(
 
 
 @router.get("/{highlight_id}/export/{export_id}/status")
-async def get_export_status(highlight_id: str, export_id: str):
+async def get_export_status(highlight_id: int, export_id: str):
     """Export 작업 상태 조회"""
     job_status = export_processor.get_job_status(export_id)
 
@@ -133,7 +133,7 @@ async def get_export_status(highlight_id: str, export_id: str):
 
 
 @router.get("/{highlight_id}/export/{export_id}/download")
-async def download_export(highlight_id: str, export_id: str):
+async def download_export(highlight_id: int, export_id: str):
     """Export 완료된 하이라이트 클립 다운로드"""
     job = export_processor.get_job(export_id)
 
@@ -175,7 +175,7 @@ async def download_export(highlight_id: str, export_id: str):
 
 
 @router.delete("/{highlight_id}")
-async def delete_highlight(highlight_id: str, db: AsyncSession = Depends(get_db)):
+async def delete_highlight(highlight_id: int, db: AsyncSession = Depends(get_db)):
     """하이라이트 삭제"""
     repo = HighlightRepository(db)
     success = await repo.delete(highlight_id)

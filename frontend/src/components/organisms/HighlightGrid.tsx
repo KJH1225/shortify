@@ -7,7 +7,7 @@ interface HighlightGridProps {
   highlights: Highlight[];
   onPlay: (highlight: Highlight) => void;
   onExport: (highlight: Highlight) => void;
-  exportingHighlightId?: string | null;
+  exportingHighlightId?: number | null;
 }
 
 export function HighlightGrid({ highlights, onPlay, onExport, exportingHighlightId }: HighlightGridProps) {

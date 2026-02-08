@@ -11,11 +11,11 @@ import type { Highlight } from '@/types';
 
 export default function Home() {
   const { status, highlights, setStatus, setHighlights, reset } = useVideoStore();
-  const [exportingHighlightId, setExportingHighlightId] = useState<string | null>(null);
+  const [exportingHighlightId, setExportingHighlightId] = useState<number | null>(null);
 
   const isProcessing = status.status === 'uploading' || status.status === 'processing';
 
-  const pollVideoStatus = async (videoId: string) => {
+  const pollVideoStatus = async (videoId: number) => {
     const maxAttempts = 60;
     let attempts = 0;
 

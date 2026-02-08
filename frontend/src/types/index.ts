@@ -5,7 +5,7 @@ export interface VideoSource {
 }
 
 export interface Highlight {
-  id: string;
+  id: number;
   startTime: number;
   endTime: number;
   title: string;
@@ -21,7 +21,7 @@ export interface ProcessingStatus {
 }
 
 export interface VideoProject {
-  id: string;
+  id: number;
   title: string;
   source: VideoSource;
   duration: number;

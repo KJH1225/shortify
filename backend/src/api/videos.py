@@ -11,7 +11,6 @@ from core.constants import (
     MAX_FILE_SIZE,
     YOUTUBE_URL_PATTERNS,
 )
-import uuid
 
 router = APIRouter()
 processor = VideoProcessor()
@@ -75,21 +74,19 @@ async def upload_video(
             ).model_dump()
         )
 
-    video_id = str(uuid.uuid4())
     repo = VideoRepository(db)
 
     # DB에 비디오 레코드 생성
     video = await repo.create(
-        video_id=video_id,
         title=file.filename or "Untitled",
         source=VideoSource(type="file", filename=file.filename),
         status=ProcessingStatus.UPLOADING,
     )
-    await repo.update_status(video_id, ProcessingStatus.UPLOADING, 0, "업로드 중...")
+    await repo.update_status(video.id, ProcessingStatus.UPLOADING, 0, "업로드 중...")
     await db.commit()
 
     # 백그라운드에서 처리
-    background_tasks.add_task(processor.process_file, video_id, file)
+    background_tasks.add_task(processor.process_file, video.id, file)
 
     return VideoResponse(**video_to_dict(video))
 
@@ -114,27 +111,25 @@ async def process_youtube(
             ).model_dump()
         )
 
-    video_id = str(uuid.uuid4())
     repo = VideoRepository(db)
 
     # DB에 비디오 레코드 생성
     video = await repo.create(
-        video_id=video_id,
         title=f"YouTube: {video_id_yt}",
         source=VideoSource(type="youtube", url=request.url),
         status=ProcessingStatus.PROCESSING,
     )
-    await repo.update_status(video_id, ProcessingStatus.PROCESSING, 0, "YouTube 영상 정보 가져오는 중...")
+    await repo.update_status(video.id, ProcessingStatus.PROCESSING, 0, "YouTube 영상 정보 가져오는 중...")
     await db.commit()
 
     # 백그라운드에서 처리
-    background_tasks.add_task(processor.process_youtube, video_id, request.url)
+    background_tasks.add_task(processor.process_youtube, video.id, request.url)
 
     return VideoResponse(**video_to_dict(video))
 
 
 @router.get("/{video_id}", response_model=VideoResponse)
-async def get_video(video_id: str, db: AsyncSession = Depends(get_db)):
+async def get_video(video_id: int, db: AsyncSession = Depends(get_db)):
     """영상 정보 조회"""
     repo = VideoRepository(db)
     video = await repo.get_by_id(video_id)
@@ -161,7 +156,7 @@ async def list_videos(db: AsyncSession = Depends(get_db)):
 
 
 @router.delete("/{video_id}")
-async def delete_video(video_id: str, db: AsyncSession = Depends(get_db)):
+async def delete_video(video_id: int, db: AsyncSession = Depends(get_db)):
     """영상 삭제"""
     repo = VideoRepository(db)
     deleted = await repo.delete(video_id)

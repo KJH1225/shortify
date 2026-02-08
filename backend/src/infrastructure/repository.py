@@ -16,14 +16,12 @@ class VideoRepository:
 
     async def create(
         self,
-        video_id: str,
         title: str,
         source: VideoSource,
         status: ProcessingStatus = ProcessingStatus.IDLE,
     ) -> Video:
         """Create a new video record"""
         video = Video(
-            id=video_id,
             title=title,
             source_type=source.type,
             source_url=source.url,
@@ -36,7 +34,7 @@ class VideoRepository:
         await self.db.flush()
         return video
 
-    async def get_by_id(self, video_id: str) -> Optional[Video]:
+    async def get_by_id(self, video_id: int) -> Optional[Video]:
         """Get video by ID with highlights"""
         result = await self.db.execute(
             select(Video)
@@ -56,7 +54,7 @@ class VideoRepository:
 
     async def update_status(
         self,
-        video_id: str,
+        video_id: int,
         status: ProcessingStatus,
         progress: int,
         message: str,
@@ -71,7 +69,7 @@ class VideoRepository:
             await self.db.flush()
         return video
 
-    async def update_duration(self, video_id: str, duration: float) -> Optional[Video]:
+    async def update_duration(self, video_id: int, duration: float) -> Optional[Video]:
         """Update video duration"""
         video = await self.get_by_id(video_id)
         if video:
@@ -80,7 +78,7 @@ class VideoRepository:
             await self.db.flush()
         return video
 
-    async def delete(self, video_id: str) -> bool:
+    async def delete(self, video_id: int) -> bool:
         """Delete video and its highlights"""
         video = await self.get_by_id(video_id)
         if video:
@@ -98,7 +96,7 @@ class HighlightRepository:
 
     async def create_batch(
         self,
-        video_id: str,
+        video_id: int,
         highlights_data: List[dict],
     ) -> List[Highlight]:
         """Create multiple highlights for a video"""
@@ -119,7 +117,7 @@ class HighlightRepository:
         await self.db.flush()
         return highlights
 
-    async def get_by_video_id(self, video_id: str) -> List[Highlight]:
+    async def get_by_video_id(self, video_id: int) -> List[Highlight]:
         """Get all highlights for a video"""
         result = await self.db.execute(
             select(Highlight)
@@ -128,14 +126,14 @@ class HighlightRepository:
         )
         return list(result.scalars().all())
 
-    async def get_by_id(self, highlight_id: str) -> Optional[Highlight]:
+    async def get_by_id(self, highlight_id: int) -> Optional[Highlight]:
         """Get highlight by ID"""
         result = await self.db.execute(
             select(Highlight).where(Highlight.id == highlight_id)
         )
         return result.scalar_one_or_none()
 
-    async def delete(self, highlight_id: str) -> bool:
+    async def delete(self, highlight_id: int) -> bool:
         """Delete a highlight by ID"""
         highlight = await self.get_by_id(highlight_id)
         if highlight:
@@ -144,7 +142,7 @@ class HighlightRepository:
             return True
         return False
 
-    async def delete_by_video_id(self, video_id: str) -> int:
+    async def delete_by_video_id(self, video_id: int) -> int:
         """Delete all highlights for a video"""
         highlights = await self.get_by_video_id(video_id)
         count = len(highlights)

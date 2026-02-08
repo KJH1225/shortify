@@ -4,7 +4,7 @@ import type { Highlight, ProcessingStatus } from '@/types';
 // 공통 Mock 데이터 (Backend와 동기화)
 export const MOCK_HIGHLIGHTS: Highlight[] = [
   {
-    id: 'h1',
+    id: 1,
     startTime: 45,
     endTime: 78,
     title: '핵심 개념 설명',
@@ -12,7 +12,7 @@ export const MOCK_HIGHLIGHTS: Highlight[] = [
     score: 0.95,
   },
   {
-    id: 'h2',
+    id: 2,
     startTime: 120,
     endTime: 165,
     title: '놀라운 반전',
@@ -20,7 +20,7 @@ export const MOCK_HIGHLIGHTS: Highlight[] = [
     score: 0.92,
   },
   {
-    id: 'h3',
+    id: 3,
     startTime: 210,
     endTime: 245,
     title: '실용적인 팁',
@@ -28,7 +28,7 @@ export const MOCK_HIGHLIGHTS: Highlight[] = [
     score: 0.88,
   },
   {
-    id: 'h4',
+    id: 4,
     startTime: 300,
     endTime: 340,
     title: '감동적인 순간',
@@ -36,7 +36,7 @@ export const MOCK_HIGHLIGHTS: Highlight[] = [
     score: 0.85,
   },
   {
-    id: 'h5',
+    id: 5,
     startTime: 420,
     endTime: 480,
     title: '결론 및 요약',

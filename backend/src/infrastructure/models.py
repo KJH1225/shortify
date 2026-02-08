@@ -1,22 +1,17 @@
 """SQLAlchemy ORM models"""
 from sqlalchemy import Column, String, Float, Integer, DateTime, Enum as SQLEnum, ForeignKey, Text
+from sqlalchemy.dialects.mysql import INTEGER as MySQLInteger
 from sqlalchemy.orm import relationship
 from datetime import datetime
-import uuid
 from infrastructure.database import Base
 from models.schemas import ProcessingStatus
-
-
-def generate_uuid():
-    """Generate UUID string for primary keys"""
-    return str(uuid.uuid4())
 
 
 class Video(Base):
     """Video table"""
     __tablename__ = "videos"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
+    id = Column(MySQLInteger(unsigned=True), primary_key=True, autoincrement=True)
     title = Column(String(255), nullable=False)
 
     # Source information (JSON-like storage)
@@ -47,8 +42,8 @@ class Highlight(Base):
     """Highlight table"""
     __tablename__ = "highlights"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
-    video_id = Column(String(36), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False)
+    id = Column(MySQLInteger(unsigned=True), primary_key=True, autoincrement=True)
+    video_id = Column(MySQLInteger(unsigned=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False)
 
     start_time = Column(Float, nullable=False)
     end_time = Column(Float, nullable=False)
