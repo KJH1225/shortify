@@ -161,11 +161,15 @@ class ExportProcessor:
         if not job:
             return {"error": "Job not found"}
 
+        download_url = None
+        if job.status == ExportStatus.COMPLETED:
+            download_url = f"/api/highlights/{job.highlight_id}/export/{job.export_id}/download"
+
         return {
             "export_id": job.export_id,
             "highlight_id": job.highlight_id,
             "status": job.status.value,
-            "output_path": job.output_path,
+            "download_url": download_url,
             "error_message": job.error_message,
             "created_at": job.created_at.isoformat(),
             "completed_at": job.completed_at.isoformat() if job.completed_at else None,

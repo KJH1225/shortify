@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { MainLayout } from '@/components/templates/MainLayout';
 import { VideoUploader } from '@/components/molecules/VideoUploader';
 import { ProcessingStatus } from '@/components/molecules/ProcessingStatus';
@@ -10,6 +11,7 @@ import type { Highlight } from '@/types';
 
 export default function Home() {
   const { status, highlights, setStatus, setHighlights, reset } = useVideoStore();
+  const [exportingHighlightId, setExportingHighlightId] = useState<string | null>(null);
 
   const isProcessing = status.status === 'uploading' || status.status === 'processing';
 
@@ -121,15 +123,49 @@ export default function Home() {
   };
 
   const handleExport = async (highlight: Highlight) => {
-    console.log('Export highlight:', highlight.title);
+    if (exportingHighlightId) return;
+    setExportingHighlightId(highlight.id);
 
     try {
       const response = await highlightApi.export(highlight.id);
-      console.log('Export started:', response.data);
-      alert(`Export started! Job ID: ${response.data.export_id}`);
+      const exportId = response.data.export_id;
+
+      // Poll export status
+      let attempts = 0;
+      const maxAttempts = 60;
+
+      const poll = async () => {
+        if (attempts >= maxAttempts) {
+          setExportingHighlightId(null);
+          alert('Export timeout');
+          return;
+        }
+
+        try {
+          const statusRes = await highlightApi.getExportStatus(highlight.id, exportId);
+          const exportStatus = statusRes.data.status;
+
+          if (exportStatus === 'completed') {
+            highlightApi.downloadExport(highlight.id, exportId);
+            setExportingHighlightId(null);
+          } else if (exportStatus === 'error') {
+            setExportingHighlightId(null);
+            alert(statusRes.data.error_message || 'Export failed');
+          } else {
+            attempts++;
+            setTimeout(poll, 1000);
+          }
+        } catch {
+          setExportingHighlightId(null);
+          alert('Export status check failed');
+        }
+      };
+
+      poll();
     } catch (error) {
-      console.error('Export error:', error);
-      alert('Export failed');
+      setExportingHighlightId(null);
+      const message = error instanceof ApiRequestError ? error.message : 'Export failed';
+      alert(message);
     }
   };
 
@@ -167,6 +203,7 @@ export default function Home() {
           highlights={highlights}
           onPlay={handlePlay}
           onExport={handleExport}
+          exportingHighlightId={exportingHighlightId}
         />
       </div>
     </MainLayout>

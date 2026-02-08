@@ -7,9 +7,10 @@ interface HighlightGridProps {
   highlights: Highlight[];
   onPlay: (highlight: Highlight) => void;
   onExport: (highlight: Highlight) => void;
+  exportingHighlightId?: string | null;
 }
 
-export function HighlightGrid({ highlights, onPlay, onExport }: HighlightGridProps) {
+export function HighlightGrid({ highlights, onPlay, onExport, exportingHighlightId }: HighlightGridProps) {
   if (highlights.length === 0) {
     return (
       <div className="text-center py-12">
@@ -37,6 +38,7 @@ export function HighlightGrid({ highlights, onPlay, onExport }: HighlightGridPro
             highlight={highlight}
             onPlay={onPlay}
             onExport={onExport}
+            isExporting={exportingHighlightId === highlight.id}
           />
         ))}
       </div>

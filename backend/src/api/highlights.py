@@ -1,9 +1,11 @@
+import os
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from models import HighlightResponse, ApiResponse, ApiError
 from infrastructure.database import get_db
 from infrastructure.repository import HighlightRepository, VideoRepository
-from services.export_processor import export_processor
+from services.export_processor import export_processor, ExportStatus
 from core.config import get_settings
 from pathlib import Path
 
@@ -128,6 +130,48 @@ async def get_export_status(highlight_id: str, export_id: str):
         )
 
     return ApiResponse(data=job_status)
+
+
+@router.get("/{highlight_id}/export/{export_id}/download")
+async def download_export(highlight_id: str, export_id: str):
+    """Export 완료된 하이라이트 클립 다운로드"""
+    job = export_processor.get_job(export_id)
+
+    if not job:
+        raise HTTPException(
+            status_code=404,
+            detail=ApiError(
+                code="EXPORT_JOB_NOT_FOUND",
+                message="Export 작업을 찾을 수 없습니다",
+                details={"export_id": export_id}
+            ).model_dump()
+        )
+
+    if job.status != ExportStatus.COMPLETED:
+        raise HTTPException(
+            status_code=409,
+            detail=ApiError(
+                code="EXPORT_NOT_READY",
+                message="Export가 아직 완료되지 않았습니다",
+                details={"status": job.status.value}
+            ).model_dump()
+        )
+
+    if not job.output_path or not os.path.exists(job.output_path):
+        raise HTTPException(
+            status_code=404,
+            detail=ApiError(
+                code="EXPORT_FILE_NOT_FOUND",
+                message="Export 파일을 찾을 수 없습니다",
+                details={"export_id": export_id}
+            ).model_dump()
+        )
+
+    return FileResponse(
+        path=job.output_path,
+        media_type="video/mp4",
+        filename=f"highlight_{highlight_id}.mp4",
+    )
 
 
 @router.delete("/{highlight_id}")

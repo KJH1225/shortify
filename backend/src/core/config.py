@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     max_file_size: int = 2 * 1024 * 1024 * 1024  # 2GB
 
     class Config:
-        env_file = ".env"
+        env_file = "../.env"
 
 
 @lru_cache()

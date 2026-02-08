@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Play, Download, Clock, Star } from 'lucide-react';
+import { Play, Download, Clock, Star, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import type { Highlight } from '@/types';
@@ -22,6 +22,7 @@ interface HighlightCardProps {
   highlight: Highlight;
   onPlay: (highlight: Highlight) => void;
   onExport: (highlight: Highlight) => void;
+  isExporting?: boolean;
 }
 
 function formatTime(seconds: number): string {
@@ -30,7 +31,7 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-export function HighlightCard({ highlight, onPlay, onExport }: HighlightCardProps) {
+export function HighlightCard({ highlight, onPlay, onExport, isExporting = false }: HighlightCardProps) {
   const duration = highlight.endTime - highlight.startTime;
 
   return (
@@ -64,8 +65,13 @@ export function HighlightCard({ highlight, onPlay, onExport }: HighlightCardProp
               variant="secondary"
               className="rounded-full"
               onClick={() => onExport(highlight)}
+              disabled={isExporting}
             >
-              <Download className="h-5 w-5" />
+              {isExporting ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Download className="h-5 w-5" />
+              )}
             </Button>
           </div>
           <div className="absolute bottom-2 right-2 px-2 py-1 rounded bg-black/70 text-xs text-white">

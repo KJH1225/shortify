@@ -54,6 +54,16 @@ export interface ExportResponse {
   estimated_time: number;
 }
 
+export interface ExportStatusResponse {
+  export_id: string;
+  highlight_id: string;
+  status: 'pending' | 'processing' | 'completed' | 'error';
+  download_url: string | null;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
 // Error handling helper
 class ApiRequestError extends Error {
   constructor(
@@ -148,6 +158,27 @@ export const highlightApi = {
       method: 'POST',
     });
     return handleResponse(response);
+  },
+
+  /**
+   * Get export job status
+   */
+  getExportStatus: async (highlightId: string, exportId: string): Promise<ApiResponse<ExportStatusResponse>> => {
+    const response = await fetch(`${API_URL}/api/highlights/${highlightId}/export/${exportId}/status`);
+    return handleResponse(response);
+  },
+
+  /**
+   * Download exported highlight clip
+   */
+  downloadExport: (highlightId: string, exportId: string): void => {
+    const url = `${API_URL}/api/highlights/${highlightId}/export/${exportId}/download`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `highlight_${highlightId}.mp4`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   },
 
   /**

@@ -25,7 +25,11 @@ class Video(Base):
     source_filename = Column(String(255), nullable=True)
 
     duration = Column(Float, nullable=True)
-    status = Column(SQLEnum(ProcessingStatus), nullable=False, default=ProcessingStatus.IDLE)
+    status = Column(
+        SQLEnum(ProcessingStatus, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=ProcessingStatus.IDLE,
+    )
     progress = Column(Integer, default=0)
     message = Column(Text, default="")
 
