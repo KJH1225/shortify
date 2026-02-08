@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { MainLayout } from '@/components/templates/MainLayout';
 import { VideoUploader } from '@/components/molecules/VideoUploader';
 import { ProcessingStatus } from '@/components/molecules/ProcessingStatus';
@@ -10,7 +11,8 @@ import { useVideoStore } from '@/store/videoStore';
 import { videoApi, highlightApi, ApiRequestError } from '@/services/api';
 import type { Highlight } from '@/types';
 
-export default function Home() {
+function HomeContent() {
+  const searchParams = useSearchParams();
   const { status, highlights, setStatus, setHighlights, reset } = useVideoStore();
   const [exportingHighlightId, setExportingHighlightId] = useState<number | null>(null);
   const [currentVideoId, setCurrentVideoId] = useState<number | null>(null);
@@ -18,6 +20,41 @@ export default function Home() {
   const [showPlayer, setShowPlayer] = useState(false);
 
   const isProcessing = status.status === 'uploading' || status.status === 'processing';
+
+  const loadVideoFromHistory = async (videoId: number) => {
+    try {
+      const data = await videoApi.getById(videoId);
+      if (data.status === 'completed') {
+        setCurrentVideoId(videoId);
+        setStatus({
+          status: data.status,
+          progress: data.progress,
+          message: data.message,
+        });
+        setHighlights(data.highlights.map((h) => ({
+          id: h.id,
+          startTime: h.start_time,
+          endTime: h.end_time,
+          title: h.title,
+          description: h.description || '',
+          score: h.score,
+          thumbnailUrl: h.thumbnail_url || undefined,
+        })));
+      }
+    } catch {
+      // 영상 없음 — 무시
+    }
+  };
+
+  useEffect(() => {
+    const videoIdParam = searchParams.get('videoId');
+    if (videoIdParam) {
+      const videoId = parseInt(videoIdParam, 10);
+      if (!isNaN(videoId)) {
+        loadVideoFromHistory(videoId);
+      }
+    }
+  }, [searchParams]);
 
   const pollVideoStatus = async (videoId: number) => {
     const maxAttempts = 180;
@@ -228,5 +265,13 @@ export default function Home() {
         />
       </div>
     </MainLayout>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense>
+      <HomeContent />
+    </Suspense>
   );
 }

@@ -16,6 +16,7 @@
 |---------|------|-----------|---------|--------|
 | real-ai-integration | 2026-02-08 | 97% | 12/12 PASS | PASS |
 | video-player | 2026-02-08 | 100% | 12/12 PASS | PASS |
+| video-history | 2026-02-09 | 100% | 10/10 PASS | PASS |
 
 ## Common Design Patterns in This Project
 - `get_settings()` singleton via `@lru_cache`
@@ -31,3 +32,5 @@
   - This is a valid technical improvement, not a gap
 - When user explicitly requests removal of mock/fallback, treat as intentional change
 - Helper methods (like _save_highlights) may be inlined - count as MINOR gap if functional equivalent
+- Unused imports in design code (e.g., AlertCircle never used in JSX) -- implementation removing them is correct, not a gap
+- Frontend features (video-history) can reuse existing backend API with zero backend changes -- verify api.ts has methods before flagging
