@@ -1,4 +1,6 @@
 """Export processor for highlight video generation using FFmpeg"""
+from __future__ import annotations
+
 import asyncio
 import subprocess
 import os
@@ -9,6 +11,7 @@ from typing import Optional
 from enum import Enum
 
 from core.config import get_settings
+from infrastructure.redis_client import get_redis
 
 
 class ExportStatus(str, Enum):
@@ -40,9 +43,36 @@ class ExportJob:
         self.created_at = datetime.now()
         self.completed_at: Optional[datetime] = None
 
+    def to_dict(self) -> dict:
+        return {
+            "export_id": self.export_id,
+            "highlight_id": self.highlight_id,
+            "video_path": self.video_path,
+            "start_time": self.start_time,
+            "end_time": self.end_time,
+            "status": self.status.value,
+            "output_path": self.output_path,
+            "error_message": self.error_message,
+            "created_at": self.created_at.isoformat(),
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+        }
 
-# In-memory job storage (replace with Redis/DB in production)
-_export_jobs: dict[str, ExportJob] = {}
+    @classmethod
+    def from_dict(cls, data: dict) -> "ExportJob":
+        job = cls(
+            export_id=data["export_id"],
+            highlight_id=int(data["highlight_id"]),
+            video_path=data["video_path"],
+            start_time=float(data["start_time"]),
+            end_time=float(data["end_time"]),
+        )
+        job.status = ExportStatus(data["status"])
+        job.output_path = data.get("output_path")
+        job.error_message = data.get("error_message")
+        job.created_at = datetime.fromisoformat(data["created_at"])
+        completed_at = data.get("completed_at")
+        job.completed_at = datetime.fromisoformat(completed_at) if completed_at else None
+        return job
 
 
 class ExportProcessor:
@@ -64,6 +94,15 @@ class ExportProcessor:
         except FileNotFoundError:
             return False
 
+    def _job_key(self, export_id: str) -> str:
+        return f"export_job:{export_id}"
+
+    async def _save_job(self, job: ExportJob) -> None:
+        redis = get_redis()
+        ttl = get_settings().export_job_ttl_seconds
+        await redis.hset(self._job_key(job.export_id), mapping=job.to_dict())
+        await redis.expire(self._job_key(job.export_id), ttl)
+
     async def create_export_job(
         self,
         highlight_id: int,
@@ -81,24 +120,26 @@ class ExportProcessor:
             start_time=start_time,
             end_time=end_time,
         )
-
-        _export_jobs[export_id] = job
+        await self._save_job(job)
         return job
 
     async def process_export(self, job: ExportJob) -> ExportJob:
         """Process the export job using FFmpeg"""
         job.status = ExportStatus.PROCESSING
+        await self._save_job(job)
 
         # Check FFmpeg availability
         if not self._check_ffmpeg():
             job.status = ExportStatus.ERROR
             job.error_message = "FFmpeg is not installed or not in PATH"
+            await self._save_job(job)
             return job
 
         # Check if source video exists
         if not os.path.exists(job.video_path):
             job.status = ExportStatus.ERROR
             job.error_message = f"Source video not found: {job.video_path}"
+            await self._save_job(job)
             return job
 
         # Generate output filename
@@ -107,16 +148,9 @@ class ExportProcessor:
         output_path = self.output_dir / output_filename
 
         try:
-            # FFmpeg command for video clipping
-            # -ss: start time (before -i for fast seeking)
-            # -t: duration
-            # -c:v libx264: H.264 video codec
-            # -c:a aac: AAC audio codec
-            # -preset fast: encoding speed/quality balance
-            # -crf 23: quality (lower = better, 18-28 is reasonable)
             cmd = [
                 "ffmpeg",
-                "-y",  # Overwrite output file
+                "-y",
                 "-ss", str(job.start_time),
                 "-i", job.video_path,
                 "-t", str(duration),
@@ -124,18 +158,17 @@ class ExportProcessor:
                 "-c:a", "aac",
                 "-preset", "fast",
                 "-crf", "23",
-                "-movflags", "+faststart",  # Enable streaming
+                "-movflags", "+faststart",
                 str(output_path),
             ]
 
-            # Run FFmpeg asynchronously
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
 
-            stdout, stderr = await process.communicate()
+            _, stderr = await process.communicate()
 
             if process.returncode == 0:
                 job.status = ExportStatus.COMPLETED
@@ -143,21 +176,26 @@ class ExportProcessor:
                 job.completed_at = datetime.now()
             else:
                 job.status = ExportStatus.ERROR
-                job.error_message = stderr.decode()[:500]  # Limit error message
+                job.error_message = stderr.decode()[:500]
 
         except Exception as e:
             job.status = ExportStatus.ERROR
             job.error_message = str(e)
 
+        await self._save_job(job)
         return job
 
-    def get_job(self, export_id: str) -> Optional[ExportJob]:
+    async def get_job(self, export_id: str) -> Optional[ExportJob]:
         """Get export job by ID"""
-        return _export_jobs.get(export_id)
+        redis = get_redis()
+        data = await redis.hgetall(self._job_key(export_id))
+        if not data:
+            return None
+        return ExportJob.from_dict(data)
 
-    def get_job_status(self, export_id: str) -> dict:
+    async def get_job_status(self, export_id: str) -> dict:
         """Get job status as dict"""
-        job = self.get_job(export_id)
+        job = await self.get_job(export_id)
         if not job:
             return {"error": "Job not found"}
 

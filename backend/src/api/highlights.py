@@ -117,7 +117,7 @@ async def export_highlight(
 @router.get("/{highlight_id}/export/{export_id}/status")
 async def get_export_status(highlight_id: int, export_id: str):
     """Export 작업 상태 조회"""
-    job_status = export_processor.get_job_status(export_id)
+    job_status = await export_processor.get_job_status(export_id)
 
     if "error" in job_status:
         raise HTTPException(
@@ -135,7 +135,7 @@ async def get_export_status(highlight_id: int, export_id: str):
 @router.get("/{highlight_id}/export/{export_id}/download")
 async def download_export(highlight_id: int, export_id: str):
     """Export 완료된 하이라이트 클립 다운로드"""
-    job = export_processor.get_job(export_id)
+    job = await export_processor.get_job(export_id)
 
     if not job:
         raise HTTPException(

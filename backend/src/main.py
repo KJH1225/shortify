@@ -1,20 +1,25 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from collections import defaultdict
-import time
 from contextlib import asynccontextmanager
 from api import videos, highlights, stream
 from infrastructure.database import init_db, close_db
+from infrastructure.redis_client import init_redis, close_redis, get_redis
+
+# Rate Limiting 설정
+RATE_LIMIT_REQUESTS = 60  # 요청 수
+RATE_LIMIT_WINDOW = 60  # 초 단위 윈도우
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """애플리케이션 라이프사이클 관리"""
-    # Startup: DB 연결 확인 (스키마는 Alembic으로 관리)
+    # Startup: DB/Redis 연결 확인
     await init_db()
+    await init_redis()
     yield
-    # Shutdown: DB 연결 종료
+    # Shutdown: 연결 종료
+    await close_redis()
     await close_db()
 
 
@@ -25,33 +30,31 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Rate Limiting 설정
-RATE_LIMIT_REQUESTS = 60  # 요청 수
-RATE_LIMIT_WINDOW = 60  # 초 단위 윈도우
-rate_limit_store: dict[str, list[float]] = defaultdict(list)
-
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
-    """간단한 Rate Limiting 미들웨어"""
+    """Redis 기반 Rate Limiting 미들웨어"""
     client_ip = request.client.host if request.client else "unknown"
-    current_time = time.time()
+    redis = get_redis()
+    key = f"rate_limit:{client_ip}"
 
-    # 윈도우 밖의 오래된 요청 제거
-    rate_limit_store[client_ip] = [
-        req_time for req_time in rate_limit_store[client_ip]
-        if current_time - req_time < RATE_LIMIT_WINDOW
-    ]
+    current_time = await redis.time()
+    now_seconds = current_time[0]
+    window_start = now_seconds - RATE_LIMIT_WINDOW
 
-    # Rate limit 체크
-    if len(rate_limit_store[client_ip]) >= RATE_LIMIT_REQUESTS:
+    await redis.zremrangebyscore(key, "-inf", window_start)
+    request_count = await redis.zcard(key)
+
+    if request_count >= RATE_LIMIT_REQUESTS:
         return JSONResponse(
             status_code=429,
-            content={"detail": "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."}
+            content={"detail": "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."},
         )
 
-    # 현재 요청 기록
-    rate_limit_store[client_ip].append(current_time)
+    member = f"{now_seconds}:{current_time[1]}"
+    score = now_seconds + (current_time[1] / 1_000_000)
+    await redis.zadd(key, {member: score})
+    await redis.expire(key, RATE_LIMIT_WINDOW)
 
     response = await call_next(request)
     return response
