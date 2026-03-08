@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     # AI 분석 설정
     audio_sample_rate: int = 16000
     whisper_chunk_size_mb: int = 24
+    whisper_parallel_chunks: int = 10
     max_highlights: int = 10
     ai_retry_count: int = 3
     ai_retry_delay: float = 2.0
@@ -38,6 +39,10 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://localhost:6379/0"
     export_job_ttl_seconds: int = 24 * 60 * 60
+
+    # Rate Limiting
+    rate_limit_requests: int = 60
+    rate_limit_window: int = 60
 
     class Config:
         env_file = "../.env"

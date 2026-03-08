@@ -36,6 +36,7 @@ class TranscriptionService:
         self.client = AsyncOpenAI(api_key=settings.openai_api_key)
         self.model = settings.openai_whisper_model
         self.chunk_size_mb = settings.whisper_chunk_size_mb
+        self.parallel_chunks = settings.whisper_parallel_chunks
         self.retry_count = settings.ai_retry_count
         self.retry_delay = settings.ai_retry_delay
 
@@ -156,25 +157,38 @@ class TranscriptionService:
         chunk_paths: list[str],
         on_progress: Callable[[str], Awaitable[None]] | None,
     ) -> TranscriptionResult:
-        """청크별 Whisper 호출 후 결과 병합"""
+        """청크별 Whisper 병렬 호출 후 결과 병합"""
+        total = len(chunk_paths)
+        semaphore = asyncio.Semaphore(self.parallel_chunks)
+        completed = 0
+
+        async def _transcribe_one(chunk_path: str) -> TranscriptionResult:
+            nonlocal completed
+            async with semaphore:
+                result = await self._transcribe_single(chunk_path)
+                completed += 1
+                if on_progress:
+                    msg = AI_PROCESSING_MESSAGES["stt_chunking"].format(
+                        current=completed, total=total
+                    )
+                    await on_progress(msg)
+                return result
+
+        # 모든 청크 병렬 호출 (semaphore로 동시 실행 수 제한)
+        results = await asyncio.gather(
+            *[_transcribe_one(path) for path in chunk_paths]
+        )
+
+        # 순서대로 결과 병합 (gather는 입력 순서 보장)
         all_segments: list[TranscriptSegment] = []
         all_texts: list[str] = []
         language = ""
         time_offset = 0.0
 
-        for i, chunk_path in enumerate(chunk_paths):
-            if on_progress:
-                msg = AI_PROCESSING_MESSAGES["stt_chunking"].format(
-                    current=i + 1, total=len(chunk_paths)
-                )
-                await on_progress(msg)
-
-            result = await self._transcribe_single(chunk_path)
-
+        for result in results:
             if not language and result.language:
                 language = result.language
 
-            # 타임스탬프에 오프셋 추가
             for seg in result.segments:
                 all_segments.append(TranscriptSegment(
                     start=seg.start + time_offset,
@@ -184,7 +198,6 @@ class TranscriptionService:
 
             all_texts.append(result.full_text)
 
-            # 다음 청크의 오프셋 = 현재 청크 마지막 세그먼트 끝 시간
             if result.segments:
                 time_offset += result.segments[-1].end
 
