@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import subprocess
 import os
 import uuid
@@ -32,6 +33,7 @@ class ExportJob:
         start_time: float,
         end_time: float,
         layout: str = "original",
+        clips: list[dict] | None = None,
     ):
         self.export_id = export_id
         self.highlight_id = highlight_id
@@ -39,6 +41,7 @@ class ExportJob:
         self.start_time = start_time
         self.end_time = end_time
         self.layout = layout
+        self.clips = clips
         self.status = ExportStatus.PENDING
         self.output_path: Optional[str] = None
         self.error_message: Optional[str] = None
@@ -53,6 +56,7 @@ class ExportJob:
             "start_time": self.start_time,
             "end_time": self.end_time,
             "layout": self.layout,
+            "clips": json.dumps(self.clips) if self.clips else "",
             "status": self.status.value,
             "created_at": self.created_at.isoformat(),
         }
@@ -74,6 +78,8 @@ class ExportJob:
             end_time=float(data["end_time"]),
         )
         job.layout = data.get("layout", "original")
+        clips_raw = data.get("clips", "")
+        job.clips = json.loads(clips_raw) if clips_raw else None
         job.status = ExportStatus(data["status"])
         job.output_path = data.get("output_path")
         job.error_message = data.get("error_message")
@@ -102,6 +108,17 @@ class ExportProcessor:
         except FileNotFoundError:
             return False
 
+    def _check_xfade_support(self) -> bool:
+        """Check if FFmpeg supports xfade filter (4.3+)"""
+        try:
+            result = subprocess.run(
+                ["ffmpeg", "-filters"],
+                capture_output=True, text=True,
+            )
+            return "xfade" in result.stdout
+        except FileNotFoundError:
+            return False
+
     def _job_key(self, export_id: str) -> str:
         return f"export_job:{export_id}"
 
@@ -118,6 +135,7 @@ class ExportProcessor:
         start_time: float,
         end_time: float,
         layout: str = "original",
+        clips: list[dict] | None = None,
     ) -> ExportJob:
         """Create a new export job"""
         export_id = f"export_{uuid.uuid4().hex[:8]}"
@@ -129,6 +147,7 @@ class ExportProcessor:
             start_time=start_time,
             end_time=end_time,
             layout=layout,
+            clips=clips,
         )
         await self._save_job(job)
         return job
@@ -169,7 +188,19 @@ class ExportProcessor:
         output_path = self.output_dir / output_filename
 
         try:
-            if job.layout == "shortform":
+            has_multi_clips = job.clips and len(job.clips) > 1
+
+            if has_multi_clips and job.layout == "shortform":
+                src_w, src_h = await self._get_video_dimensions(job.video_path)
+                cmd = self._build_shortform_concat_cmd(
+                    job.video_path, str(output_path), job.clips,
+                    src_w, src_h,
+                )
+            elif has_multi_clips:
+                cmd = self._build_concat_cmd(
+                    job.video_path, str(output_path), job.clips,
+                )
+            elif job.layout == "shortform":
                 src_w, src_h = await self._get_video_dimensions(job.video_path)
                 cmd = self._build_shortform_cmd(
                     job.video_path, str(output_path),
@@ -290,6 +321,159 @@ class ExportProcessor:
                 "-movflags", "+faststart",
                 output_path,
             ]
+
+    def _build_concat_cmd(
+        self,
+        input_path: str,
+        output_path: str,
+        clips: list[dict],
+    ) -> list[str]:
+        """서브클립 concat FFmpeg 커맨드 빌드 (xfade 크로스페이드 + concat 폴백)"""
+        n = len(clips)
+        fade = get_settings().crossfade_duration
+        use_xfade = fade > 0 and n > 1 and self._check_xfade_support()
+
+        inputs: list[str] = []
+        filter_parts: list[str] = []
+        for i, clip in enumerate(clips):
+            dur = clip["end"] - clip["start"]
+            inputs.extend(["-ss", str(clip["start"]), "-t", str(dur), "-i", input_path])
+            filter_parts.append(f"[{i}:v]setpts=PTS-STARTPTS[v{i}]")
+            filter_parts.append(f"[{i}:a]asetpts=PTS-STARTPTS[a{i}]")
+
+        if use_xfade:
+            durations = [clip["end"] - clip["start"] for clip in clips]
+
+            # Video xfade chaining
+            prev_v = "v0"
+            accumulated = durations[0]
+            for i in range(1, n):
+                offset = accumulated - fade
+                out_label = "outv" if i == n - 1 else f"xv{i}"
+                filter_parts.append(
+                    f"[{prev_v}][v{i}]xfade=transition=fade:duration={fade}:offset={offset}[{out_label}]"
+                )
+                accumulated += durations[i] - fade
+                prev_v = out_label
+
+            # Audio acrossfade chaining
+            prev_a = "a0"
+            for i in range(1, n):
+                out_label = "outa" if i == n - 1 else f"xa{i}"
+                filter_parts.append(
+                    f"[{prev_a}][a{i}]acrossfade=d={fade}:c1=tri:c2=tri[{out_label}]"
+                )
+                prev_a = out_label
+        else:
+            streams = "".join(f"[v{i}][a{i}]" for i in range(n))
+            filter_parts.append(f"{streams}concat=n={n}:v=1:a=1[outv][outa]")
+
+        filter_complex = ";".join(filter_parts)
+
+        return [
+            "ffmpeg", "-y",
+            *inputs,
+            "-filter_complex", filter_complex,
+            "-map", "[outv]", "-map", "[outa]",
+            "-c:v", "libx264",
+            "-c:a", "aac",
+            "-preset", "fast",
+            "-crf", "23",
+            "-movflags", "+faststart",
+            output_path,
+        ]
+
+    def _build_shortform_concat_cmd(
+        self,
+        input_path: str,
+        output_path: str,
+        clips: list[dict],
+        src_width: int,
+        src_height: int,
+    ) -> list[str]:
+        """서브클립 concat + 9:16 숏폼 레이아웃 FFmpeg 커맨드 (xfade 크로스페이드 + 폴백)"""
+        from core.constants import (
+            SHORTFORM_WIDTH, SHORTFORM_HEIGHT,
+            SHORTFORM_CONTENT_HEIGHT, SHORTFORM_CONTENT_Y,
+            SHORTFORM_BLUR_STRENGTH,
+        )
+
+        W = SHORTFORM_WIDTH
+        H = SHORTFORM_HEIGHT
+        CY = SHORTFORM_CONTENT_Y
+        CH = SHORTFORM_CONTENT_HEIGHT
+        BLUR = SHORTFORM_BLUR_STRENGTH
+
+        n = len(clips)
+        fade = get_settings().crossfade_duration
+        use_xfade = fade > 0 and n > 1 and self._check_xfade_support()
+        is_portrait = src_height > src_width
+
+        inputs: list[str] = []
+        filter_parts: list[str] = []
+        for i, clip in enumerate(clips):
+            dur = clip["end"] - clip["start"]
+            inputs.extend(["-ss", str(clip["start"]), "-t", str(dur), "-i", input_path])
+            filter_parts.append(f"[{i}:v]setpts=PTS-STARTPTS[v{i}]")
+            filter_parts.append(f"[{i}:a]asetpts=PTS-STARTPTS[a{i}]")
+
+        if use_xfade:
+            durations = [clip["end"] - clip["start"] for clip in clips]
+
+            # Video xfade chaining -> [cv]
+            prev_v = "v0"
+            accumulated = durations[0]
+            for i in range(1, n):
+                offset = accumulated - fade
+                out_label = "cv" if i == n - 1 else f"xv{i}"
+                filter_parts.append(
+                    f"[{prev_v}][v{i}]xfade=transition=fade:duration={fade}:offset={offset}[{out_label}]"
+                )
+                accumulated += durations[i] - fade
+                prev_v = out_label
+
+            # Audio acrossfade chaining -> [ca]
+            prev_a = "a0"
+            for i in range(1, n):
+                out_label = "ca" if i == n - 1 else f"xa{i}"
+                filter_parts.append(
+                    f"[{prev_a}][a{i}]acrossfade=d={fade}:c1=tri:c2=tri[{out_label}]"
+                )
+                prev_a = out_label
+        else:
+            streams = "".join(f"[v{i}][a{i}]" for i in range(n))
+            filter_parts.append(f"{streams}concat=n={n}:v=1:a=1[cv][ca]")
+
+        # Shortform layout
+        if is_portrait:
+            filter_parts.append(
+                f"[cv]scale={W}:{H}:force_original_aspect_ratio=decrease,"
+                f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1[outv]"
+            )
+        else:
+            filter_parts.append(f"[cv]split=2[cv_bg][cv_fg]")
+            filter_parts.append(
+                f"[cv_bg]scale={W}:{H},boxblur={BLUR}:{BLUR}[bg];"
+                f"[cv_fg]scale='if(gt(iw/ih,{W}/{CH}),{W},-2)'"
+                f":'if(gt(iw/ih,{W}/{CH}),-2,{CH})'[fg];"
+                f"[bg][fg]overlay=(W-w)/2:{CY}+({CH}-h)/2,setsar=1[outv]"
+            )
+
+        filter_parts.append("[ca]anull[outa]")
+        filter_complex = ";".join(filter_parts)
+
+        return [
+            "ffmpeg", "-y",
+            *inputs,
+            "-filter_complex", filter_complex,
+            "-map", "[outv]", "-map", "[outa]",
+            "-c:v", "libx264",
+            "-c:a", "aac",
+            "-preset", "fast",
+            "-crf", "23",
+            "-movflags", "+faststart",
+            output_path,
+        ]
 
     async def get_job(self, export_id: str) -> Optional[ExportJob]:
         """Get export job by ID"""

@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     # OpenAI
     openai_api_key: str = ""
     openai_whisper_model: str = "whisper-1"
-    openai_chat_model: str = "gpt-4o-mini"
+    openai_chat_model: str = "gpt-4o"
 
     # AI 분석 설정
     audio_sample_rate: int = 16000
@@ -27,6 +27,18 @@ class Settings(BaseSettings):
     max_highlights: int = 10
     ai_retry_count: int = 3
     ai_retry_delay: float = 2.0
+
+    # Multimodal analysis
+    keyframe_interval: int = 10
+    keyframe_max_count: int = 30
+    keyframe_width: int = 512
+    scene_threshold: float = 0.3
+    audio_hotspot_count: int = 10
+
+    # Highlight quality improvements
+    crossfade_duration: float = 0.3
+    snap_tolerance: float = 2.0
+    loudness_shift_threshold: float = 10.0
 
     def has_openai_key(self) -> bool:
         """OpenAI API 키가 설정되었는지 확인"""

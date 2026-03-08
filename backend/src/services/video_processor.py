@@ -11,6 +11,9 @@ from core.constants import AI_PROCESSING_MESSAGES
 from services.audio_extractor import AudioExtractor
 from services.transcription_service import TranscriptionService
 from services.highlight_analyzer import HighlightAnalyzer
+from services.keyframe_extractor import KeyframeExtractor
+from services.audio_analyzer import AudioAnalyzer
+from services.scene_detector import SceneDetector
 
 
 class VideoProcessor:
@@ -21,6 +24,9 @@ class VideoProcessor:
         self._audio_extractor = AudioExtractor()
         self._transcription_service = TranscriptionService()
         self._highlight_analyzer = HighlightAnalyzer()
+        self._keyframe_extractor = KeyframeExtractor()
+        self._audio_analyzer = AudioAnalyzer()
+        self._scene_detector = SceneDetector()
 
     def _check_ytdlp(self) -> bool:
         """yt-dlp 설치 여부 확인"""
@@ -238,13 +244,45 @@ class VideoProcessor:
                 ),
             )
 
-            # === Step 3: 하이라이트 분석 (50-90%) ===
+            # === Step 3: 오디오 에너지 분석 (50-53%) ===
             await self._update_progress(
-                video_id, 55, AI_PROCESSING_MESSAGES["analysis_start"]
+                video_id, 50, "오디오 에너지 분석 중..."
+            )
+            audio_hotspots = await self._audio_analyzer.analyze(audio_path)
+
+            # === Step 4: 장면 전환 감지 (53-55%) ===
+            await self._update_progress(
+                video_id, 53, "장면 전환 감지 중..."
+            )
+            scene_changes = await self._scene_detector.detect(video_path)
+
+            # === Step 5: 스마트 키프레임 추출 (55-60%) ===
+            await self._update_progress(
+                video_id, 55, "핵심 장면 키프레임 추출 중..."
             )
 
             duration = await self._get_video_duration(video_id)
-            highlights = await self._highlight_analyzer.analyze(transcript, duration)
+            keyframe_dir = os.path.join(os.path.dirname(audio_path), "keyframes", str(video_id))
+            keyframes = await self._keyframe_extractor.extract_smart(
+                video_path, keyframe_dir, duration,
+                scene_changes=scene_changes,
+                audio_hotspot_timestamps=[h.timestamp for h in audio_hotspots],
+            )
+
+            # === Step 6: 멀티모달 하이라이트 분석 (60-90%) ===
+            await self._update_progress(
+                video_id, 60, AI_PROCESSING_MESSAGES["analysis_start"]
+            )
+
+            try:
+                highlights = await self._highlight_analyzer.analyze_multimodal(
+                    transcript, keyframes, audio_hotspots, scene_changes, duration,
+                )
+            except Exception:
+                # Fallback: 텍스트 전용 분석
+                highlights = await self._highlight_analyzer.analyze(transcript, duration)
+            finally:
+                self._keyframe_extractor.cleanup(keyframe_dir)
 
             await self._update_progress(
                 video_id, 90,
@@ -265,6 +303,7 @@ class VideoProcessor:
                     "title": h.title,
                     "description": h.description,
                     "score": h.score,
+                    "clips": h.clips,
                 }
                 for h in highlights
             ]

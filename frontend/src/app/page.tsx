@@ -39,6 +39,7 @@ function HomeContent() {
           description: h.description || '',
           score: h.score,
           thumbnailUrl: h.thumbnail_url || undefined,
+          clips: h.clips || undefined,
         })));
       }
     } catch {
@@ -200,7 +201,7 @@ function HomeContent() {
             alert(statusRes.data.error_message || 'Export failed');
           } else {
             attempts++;
-            setTimeout(poll, 1000);
+            setTimeout(poll, 3000);
           }
         } catch {
           setExportingHighlightId(null);

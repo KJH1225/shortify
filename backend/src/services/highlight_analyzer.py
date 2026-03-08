@@ -1,13 +1,18 @@
-"""GPT-4o-mini 기반 하이라이트 분석 서비스"""
+"""GPT-4o 기반 하이라이트 분석 서비스 (멀티모달 지원)"""
 import asyncio
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from openai import AsyncOpenAI
 
 from core.config import get_settings
-from core.constants import HIGHLIGHT_SYSTEM_PROMPT, HIGHLIGHT_USER_PROMPT
+from core.constants import (
+    HIGHLIGHT_SYSTEM_PROMPT, HIGHLIGHT_USER_PROMPT,
+    MULTIMODAL_SYSTEM_PROMPT, MULTIMODAL_USER_PROMPT,
+)
 from services.transcription_service import TranscriptionResult
+from services.keyframe_extractor import KeyframeInfo
+from services.audio_analyzer import AudioHotspot
 
 
 @dataclass
@@ -18,10 +23,17 @@ class HighlightResult:
     title: str
     description: str
     score: float
+    clips: list[dict] | None = None
+
+
+def _format_time(seconds: float) -> str:
+    m = int(seconds // 60)
+    s = int(seconds % 60)
+    return f"{m:02d}:{s:02d}"
 
 
 class HighlightAnalyzer:
-    """GPT-4o-mini 기반 하이라이트 분석 서비스"""
+    """GPT-4o 기반 하이라이트 분석 서비스 (멀티모달 지원)"""
 
     def __init__(self):
         settings = get_settings()
@@ -170,3 +182,172 @@ class HighlightAnalyzer:
                 non_overlapping.append(h)
 
         return non_overlapping[:self.max_highlights]
+
+    async def analyze_multimodal(
+        self,
+        transcript: TranscriptionResult,
+        keyframes: list[KeyframeInfo],
+        audio_hotspots: list[AudioHotspot],
+        scene_changes: list[float],
+        duration: float,
+    ) -> list[HighlightResult]:
+        """멀티모달 분석: 텍스트 + 키프레임 + 오디오 + 장면전환 → 서브클립 배열"""
+        formatted_transcript = self._build_transcript_text(transcript)
+        target_count = self._calculate_target_count(duration)
+
+        hotspot_text = "\n".join(
+            f"[{_format_time(h.timestamp)}] {h.description} (RMS: {h.rms_level:.1f}dB)"
+            for h in audio_hotspots
+        ) or "No significant audio hotspots detected."
+
+        scene_text = ", ".join(
+            _format_time(t) for t in scene_changes
+        ) or "No significant scene changes detected."
+
+        user_text = MULTIMODAL_USER_PROMPT.format(
+            duration=duration,
+            target_count=target_count,
+            transcript=formatted_transcript,
+            audio_hotspots=hotspot_text,
+            scene_changes=scene_text,
+        )
+
+        content: list[dict] = [{"type": "text", "text": user_text}]
+        for kf in keyframes:
+            content.append({"type": "image_url", "image_url": {
+                "url": f"data:image/jpeg;base64,{kf.base64}",
+                "detail": "low",
+            }})
+            content.append({"type": "text", "text": f"[Frame at {_format_time(kf.timestamp)}]"})
+
+        for attempt in range(self.retry_count):
+            try:
+                response = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": MULTIMODAL_SYSTEM_PROMPT},
+                        {"role": "user", "content": content},
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.3,
+                    max_tokens=4000,
+                )
+
+                result_content = response.choices[0].message.content
+                highlights = self._parse_multimodal_response(result_content, duration, transcript)
+
+                if not highlights:
+                    raise RuntimeError("유효한 하이라이트를 추출하지 못했습니다")
+
+                return sorted(highlights, key=lambda h: h.score, reverse=True)
+
+            except RuntimeError:
+                if attempt == self.retry_count - 1:
+                    raise
+                await asyncio.sleep(self.retry_delay * (2 ** attempt))
+            except Exception as e:
+                if attempt == self.retry_count - 1:
+                    raise RuntimeError(f"멀티모달 분석 실패: {e}") from e
+                await asyncio.sleep(self.retry_delay * (2 ** attempt))
+
+    def _snap_clips_to_sentences(
+        self,
+        clips: list[dict],
+        transcript: TranscriptionResult,
+        tolerance: float = 2.0,
+    ) -> list[dict]:
+        """클립 start/end를 가장 가까운 STT 세그먼트 경계로 스냅"""
+        if not transcript.segments:
+            return clips
+
+        seg_starts = [seg.start for seg in transcript.segments]
+        seg_ends = [seg.end for seg in transcript.segments]
+
+        snapped = []
+        for clip in clips:
+            s = clip["start"]
+            e = clip["end"]
+
+            # start -> 가장 가까운 세그먼트 시작점
+            best_start = min(seg_starts, key=lambda b: abs(b - s))
+            if abs(best_start - s) <= tolerance:
+                s = best_start
+
+            # end -> 가장 가까운 세그먼트 끝점
+            best_end = min(seg_ends, key=lambda b: abs(b - e))
+            if abs(best_end - e) <= tolerance:
+                e = best_end
+
+            # 스냅 후 최소 길이 검증
+            if e - s >= 3.0:
+                snapped.append({"start": s, "end": e})
+            else:
+                snapped.append(clip)
+
+        return snapped
+
+    def _parse_multimodal_response(
+        self, content: str, duration: float,
+        transcript: TranscriptionResult | None = None,
+    ) -> list[HighlightResult]:
+        """멀티모달 GPT 응답 파싱 (clips 배열 포함)"""
+        data = json.loads(content)
+
+        if isinstance(data, dict) and "highlights" in data:
+            items = data["highlights"]
+        elif isinstance(data, list):
+            items = data
+        else:
+            raise RuntimeError(f"예상치 못한 응답 형식: {type(data)}")
+
+        highlights = []
+        for item in items:
+            clips = item.get("clips", [])
+            if not clips:
+                # fallback: start_time/end_time이 있으면 단일 클립으로
+                if "start_time" in item and "end_time" in item:
+                    clips = [{"start": item["start_time"], "end": item["end_time"]}]
+                else:
+                    continue
+
+            # Validate clips
+            valid_clips = []
+            for clip in clips:
+                s = max(0.0, float(clip["start"]))
+                e = min(duration, float(clip["end"]))
+                if e > s and e - s >= 3:
+                    valid_clips.append({"start": s, "end": e})
+
+            if not valid_clips:
+                continue
+
+            # Snap to sentence boundaries
+            if transcript:
+                settings = get_settings()
+                valid_clips = self._snap_clips_to_sentences(
+                    valid_clips, transcript, settings.snap_tolerance,
+                )
+
+            # Total duration check (15-60s)
+            total_dur = sum(c["end"] - c["start"] for c in valid_clips)
+            if total_dur < 15:
+                # Extend last clip
+                deficit = 15 - total_dur
+                valid_clips[-1]["end"] = min(
+                    valid_clips[-1]["end"] + deficit, duration
+                )
+
+            start_time = valid_clips[0]["start"]
+            end_time = valid_clips[-1]["end"]
+            score = max(0.0, min(1.0, float(item.get("score", 0.5))))
+
+            highlights.append(HighlightResult(
+                start_time=start_time,
+                end_time=end_time,
+                title=str(item.get("title", ""))[:20],
+                description=str(item.get("description", ""))[:50],
+                score=score,
+                clips=valid_clips if len(valid_clips) > 1 else None,
+            ))
+
+        return highlights

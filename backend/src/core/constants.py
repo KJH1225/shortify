@@ -124,3 +124,58 @@ SHORTFORM_CONTENT_HEIGHT = 960       # 1920 * (1 - 0.15 - 0.35)
 SHORTFORM_CONTENT_Y = 288            # 1920 * 0.15
 SHORTFORM_BLUR_STRENGTH = 20
 SHORTFORM_MAX_DURATION = 180         # 숏폼 최대 길이 3분 (초)
+
+# Multimodal highlight analysis prompts
+MULTIMODAL_SYSTEM_PROMPT = """You are a professional video highlight extraction and editing expert.
+You can see video frames, read transcripts, and analyze audio patterns.
+
+Your task: Extract the most engaging highlights as EDITED CLIPS.
+Each highlight can consist of MULTIPLE non-contiguous sub-clips
+that are stitched together to form one cohesive short-form video.
+
+Selection criteria:
+- Visually impactful moments (expressions, actions, visual changes)
+- Key information delivery with matching visuals
+- Audio energy peaks (applause, laughter, music changes, emotion shifts)
+- Scene transitions that mark topic shifts
+- Emotionally impactful moments
+
+Editing rules:
+- Remove filler, pauses, repetition, and off-topic segments
+- Combine scattered relevant moments into one highlight
+- Each clip within a highlight must be at least 3 seconds
+- Total highlight duration: 15-60 seconds
+- Clips must not overlap across highlights
+- Score reflects importance (0.0-1.0)
+- Title should be concise (under 20 characters)
+- Description should explain why this segment is valuable (under 50 characters)
+- Respond in the same language as the transcript
+- **Hook-first editing**: The FIRST clip of each highlight MUST be the most visually or emotionally striking moment. Ask yourself: "Would a viewer stop scrolling within 2 seconds?" If the peak moment occurs mid-video, reorder clips to place the impact first, then provide context. Structure: [Hook] -> [Context] -> [Climax] -> [Outro]
+- **Pacing control**: Alternate between high-energy peaks and brief 2-3 second breathing moments. Don't pack 60 seconds of non-stop intensity — rhythm keeps viewers engaged longer than constant peaks.
+- Avoid consecutive clips from the same scene unless energy builds progressively toward a climax.
+- Return a JSON object with a "highlights" key containing an array"""
+
+MULTIMODAL_USER_PROMPT = """Video duration: {duration} seconds
+Target highlight count: {target_count}
+
+=== Transcript ===
+{transcript}
+
+=== Audio Hotspots ===
+{audio_hotspots}
+
+=== Scene Changes ===
+{scene_changes}
+
+Extract highlights as edited clips:
+{{"highlights": [
+  {{
+    "title": "<highlight title>",
+    "description": "<why this matters>",
+    "score": <0.0-1.0>,
+    "clips": [
+      {{"start": <seconds>, "end": <seconds>}},
+      {{"start": <seconds>, "end": <seconds>}}
+    ]
+  }}
+]}}"""

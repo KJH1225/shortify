@@ -38,6 +38,7 @@ async def get_highlight(highlight_id: int, db: AsyncSession = Depends(get_db)):
         description=highlight.description,
         score=highlight.score,
         thumbnail_url=highlight.thumbnail_url,
+        clips=highlight.clips,
         created_at=highlight.created_at,
     )
 
@@ -92,6 +93,7 @@ async def export_highlight(
         start_time=highlight.start_time,
         end_time=highlight.end_time,
         layout=export_request.layout.value,
+        clips=highlight.clips,
     )
 
     # Calculate estimated time (rough estimate based on duration)

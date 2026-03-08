@@ -81,6 +81,11 @@ export function HighlightCard({ highlight, onPlay, onExport, isExporting = false
               <span>{Math.round(highlight.score * 100)}%</span>
             </div>
           </div>
+          {highlight.clips && highlight.clips.length > 1 && (
+            <div className="text-xs text-violet-400">
+              {highlight.clips.length}개 클립 편집 ({formatTime(highlight.clips.reduce((sum, c) => sum + c.end - c.start, 0))})
+            </div>
+          )}
           <div className="flex gap-2 pt-2">
             <Button
               size="sm"

@@ -43,6 +43,7 @@ export interface HighlightResponse {
   description: string | null;
   score: number;
   thumbnail_url: string | null;
+  clips: { start: number; end: number }[] | null;
   created_at: string;
 }
 

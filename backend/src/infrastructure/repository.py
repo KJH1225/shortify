@@ -110,6 +110,7 @@ class HighlightRepository:
                 description=data["description"],
                 score=data["score"],
                 thumbnail_url=data.get("thumbnail_url"),
+                clips=data.get("clips"),
             )
             self.db.add(highlight)
             highlights.append(highlight)
@@ -176,6 +177,7 @@ def video_to_dict(video: Video) -> dict:
                 description=h.description,
                 score=h.score,
                 thumbnail_url=h.thumbnail_url,
+                clips=h.clips,
                 created_at=h.created_at,
             )
             for h in video.highlights

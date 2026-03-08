@@ -4,6 +4,11 @@ export interface VideoSource {
   url?: string;
 }
 
+export interface ClipSegment {
+  start: number;
+  end: number;
+}
+
 export interface Highlight {
   id: number;
   startTime: number;
@@ -12,6 +17,7 @@ export interface Highlight {
   description: string;
   score: number;
   thumbnailUrl?: string;
+  clips?: ClipSegment[];
 }
 
 export interface ProcessingStatus {

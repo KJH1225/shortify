@@ -79,3 +79,4 @@ next-env.d.ts
 
 # Redis
 backend/dump.rdb
+.bkit/

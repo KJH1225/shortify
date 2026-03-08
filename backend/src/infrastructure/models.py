@@ -1,5 +1,5 @@
 """SQLAlchemy ORM models"""
-from sqlalchemy import Column, String, Float, Integer, DateTime, Enum as SQLEnum, ForeignKey, Text
+from sqlalchemy import Column, String, Float, Integer, DateTime, Enum as SQLEnum, ForeignKey, Text, JSON
 from sqlalchemy.dialects.mysql import INTEGER as MySQLInteger
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -52,6 +52,7 @@ class Highlight(Base):
     description = Column(Text, nullable=True)
     score = Column(Float, nullable=False, index=True)
     thumbnail_url = Column(String(512), nullable=True)
+    clips = Column(JSON, nullable=True)
 
     created_at = Column(DateTime, default=datetime.now, nullable=False)
 

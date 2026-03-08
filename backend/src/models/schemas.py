@@ -17,6 +17,11 @@ class VideoSource(BaseModel):
     filename: str | None = None
 
 
+class ClipSegment(BaseModel):
+    start: float
+    end: float
+
+
 class HighlightBase(BaseModel):
     start_time: float
     end_time: float
@@ -24,6 +29,7 @@ class HighlightBase(BaseModel):
     description: str | None = None
     score: float
     thumbnail_url: str | None = None
+    clips: list[ClipSegment] | None = None
 
 
 class HighlightCreate(HighlightBase):
