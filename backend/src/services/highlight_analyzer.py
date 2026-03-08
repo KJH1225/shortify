@@ -286,6 +286,65 @@ class HighlightAnalyzer:
 
         return snapped
 
+    def _add_context_padding(
+        self,
+        clips: list[dict],
+        transcript: TranscriptionResult,
+        duration: float,
+        padding: float = 3.0,
+        max_total: int = 55,
+    ) -> list[dict]:
+        """각 클립 앞에 맥락 패딩 추가 (STT 세그먼트 경계 기준)"""
+        if not transcript.segments or padding <= 0:
+            return clips
+
+        seg_starts = [seg.start for seg in transcript.segments]
+
+        padded = []
+        for clip in clips:
+            new_start = clip["start"] - padding
+            new_start = max(0.0, new_start)
+
+            # STT 세그먼트 시작점으로 스냅 (문장 시작부터 포함)
+            best = min(seg_starts, key=lambda b: abs(b - new_start))
+            if best <= clip["start"] and abs(best - new_start) <= padding + 1:
+                new_start = best
+
+            new_start = max(0.0, new_start)
+            padded.append({"start": new_start, "end": clip["end"]})
+
+        # 인접 클립 겹침 제거 (뒤 클립 start를 앞 클립 end로 조정)
+        for i in range(1, len(padded)):
+            if padded[i]["start"] < padded[i - 1]["end"]:
+                padded[i]["start"] = padded[i - 1]["end"]
+
+        # 겹침 조정 후 최소 길이 미달 클립 제거
+        padded = [c for c in padded if c["end"] - c["start"] >= 2.0]
+
+        if not padded:
+            return clips
+
+        # 총 길이가 max_total 초과 시 패딩을 비례 축소
+        total = sum(c["end"] - c["start"] for c in padded)
+        if total > max_total and len(padded) == len(clips):
+            excess = total - max_total
+            padding_amounts = []
+            for p, orig in zip(padded, clips):
+                added = orig["start"] - p["start"]
+                padding_amounts.append(max(0.0, added))
+            total_padding = sum(padding_amounts)
+
+            if total_padding > 0:
+                ratio = max(0.0, (total_padding - excess) / total_padding)
+                for p, orig in zip(padded, clips):
+                    added = orig["start"] - p["start"]
+                    if added > 0:
+                        new_added = added * ratio
+                        p["start"] = orig["start"] - new_added
+                        p["start"] = max(0.0, p["start"])
+
+        return padded
+
     def _parse_multimodal_response(
         self, content: str, duration: float,
         transcript: TranscriptionResult | None = None,
@@ -321,18 +380,25 @@ class HighlightAnalyzer:
             if not valid_clips:
                 continue
 
-            # Snap to sentence boundaries
+            # Snap to sentence boundaries + context padding
             if transcript:
                 settings = get_settings()
                 valid_clips = self._snap_clips_to_sentences(
                     valid_clips, transcript, settings.snap_tolerance,
                 )
+                valid_clips = self._add_context_padding(
+                    valid_clips, transcript, duration,
+                    padding=settings.context_padding,
+                    max_total=settings.highlight_max_duration,
+                )
 
-            # Total duration check (15-60s)
+            # Total duration check
+            settings = get_settings()
+            min_dur = settings.highlight_min_duration
             total_dur = sum(c["end"] - c["start"] for c in valid_clips)
-            if total_dur < 15:
-                # Extend last clip
-                deficit = 15 - total_dur
+            if total_dur < min_dur:
+                # Extend last clip to meet minimum
+                deficit = min_dur - total_dur
                 valid_clips[-1]["end"] = min(
                     valid_clips[-1]["end"] + deficit, duration
                 )

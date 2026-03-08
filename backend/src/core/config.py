@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     snap_tolerance: float = 2.0
     loudness_shift_threshold: float = 10.0
 
+    # Shortform context
+    context_padding: float = 3.0
+    highlight_min_duration: int = 30
+    highlight_max_duration: int = 55
+
     def has_openai_key(self) -> bool:
         """OpenAI API 키가 설정되었는지 확인"""
         return bool(self.openai_api_key and self.openai_api_key.strip())

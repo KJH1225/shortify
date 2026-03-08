@@ -16,7 +16,7 @@ const ALLOWED_MIME_TYPES = [
 const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
 
 // YouTube URL 검증
-const YOUTUBE_URL_REGEX = /^https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}/;
+const YOUTUBE_URL_REGEX = /^https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}/;
 
 function validateFile(file: File): { valid: boolean; error?: string } {
   // 확장자 검증

@@ -113,6 +113,7 @@ YOUTUBE_URL_PATTERNS = [
     r'^https?://(?:www\.)?youtube\.com/v/([a-zA-Z0-9_-]{11})',
     r'^https?://youtu\.be/([a-zA-Z0-9_-]{11})',
     r'^https?://(?:www\.)?youtube\.com/shorts/([a-zA-Z0-9_-]{11})',
+    r'^https?://(?:www\.)?youtube\.com/live/([a-zA-Z0-9_-]{11})',
 ]
 
 # Shortform layout constants
@@ -144,13 +145,13 @@ Editing rules:
 - Remove filler, pauses, repetition, and off-topic segments
 - Combine scattered relevant moments into one highlight
 - Each clip within a highlight must be at least 3 seconds
-- Total highlight duration: 15-60 seconds
+- Total highlight duration: 30-55 seconds. Aim for a complete mini-narrative.
 - Clips must not overlap across highlights
 - Score reflects importance (0.0-1.0)
 - Title should be concise (under 20 characters)
 - Description should explain why this segment is valuable (under 50 characters)
 - Respond in the same language as the transcript
-- **Hook-first editing**: The FIRST clip of each highlight MUST be the most visually or emotionally striking moment. Ask yourself: "Would a viewer stop scrolling within 2 seconds?" If the peak moment occurs mid-video, reorder clips to place the impact first, then provide context. Structure: [Hook] -> [Context] -> [Climax] -> [Outro]
+- **Hook-first with context**: The FIRST clip grabs attention (2-3 seconds), then IMMEDIATELY provide a setup/context clip (3-5 seconds) so the viewer understands the topic. Each highlight must be comprehensible WITHOUT watching the original video. The viewer should understand "what is being discussed" within the first 8 seconds. Structure: [Hook 2-3s] -> [Setup/Context 3-5s] -> [Key Content] -> [Wrap-up]
 - **Pacing control**: Alternate between high-energy peaks and brief 2-3 second breathing moments. Don't pack 60 seconds of non-stop intensity — rhythm keeps viewers engaged longer than constant peaks.
 - Avoid consecutive clips from the same scene unless energy builds progressively toward a climax.
 - Return a JSON object with a "highlights" key containing an array"""
