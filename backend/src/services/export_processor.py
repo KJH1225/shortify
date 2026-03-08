@@ -44,18 +44,22 @@ class ExportJob:
         self.completed_at: Optional[datetime] = None
 
     def to_dict(self) -> dict:
-        return {
+        data: dict = {
             "export_id": self.export_id,
             "highlight_id": self.highlight_id,
             "video_path": self.video_path,
             "start_time": self.start_time,
             "end_time": self.end_time,
             "status": self.status.value,
-            "output_path": self.output_path,
-            "error_message": self.error_message,
             "created_at": self.created_at.isoformat(),
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
         }
+        if self.output_path is not None:
+            data["output_path"] = self.output_path
+        if self.error_message is not None:
+            data["error_message"] = self.error_message
+        if self.completed_at is not None:
+            data["completed_at"] = self.completed_at.isoformat()
+        return data
 
     @classmethod
     def from_dict(cls, data: dict) -> "ExportJob":
