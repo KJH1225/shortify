@@ -160,9 +160,14 @@ export const highlightApi = {
   /**
    * Export highlight to short-form video
    */
-  export: async (highlightId: number): Promise<ApiResponse<ExportResponse>> => {
+  export: async (
+    highlightId: number,
+    layout: 'original' | 'shortform' = 'original',
+  ): Promise<ApiResponse<ExportResponse>> => {
     const response = await fetch(`${API_URL}/api/highlights/${highlightId}/export`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ layout }),
     });
     return handleResponse(response);
   },

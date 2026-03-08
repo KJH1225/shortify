@@ -76,3 +76,6 @@ next-env.d.ts
 
 # Cache
 .cache/
+
+# Redis
+backend/dump.rdb

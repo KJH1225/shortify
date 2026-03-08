@@ -169,12 +169,12 @@ function HomeContent() {
     setActiveHighlight(null);
   };
 
-  const handleExport = async (highlight: Highlight) => {
+  const handleExport = async (highlight: Highlight, layout: 'original' | 'shortform' = 'original') => {
     if (exportingHighlightId) return;
     setExportingHighlightId(highlight.id);
 
     try {
-      const response = await highlightApi.export(highlight.id);
+      const response = await highlightApi.export(highlight.id, layout);
       const exportId = response.data.export_id;
 
       // Poll export status

@@ -114,3 +114,13 @@ YOUTUBE_URL_PATTERNS = [
     r'^https?://youtu\.be/([a-zA-Z0-9_-]{11})',
     r'^https?://(?:www\.)?youtube\.com/shorts/([a-zA-Z0-9_-]{11})',
 ]
+
+# Shortform layout constants
+SHORTFORM_WIDTH = 1080
+SHORTFORM_HEIGHT = 1920
+SHORTFORM_SAFE_TOP_RATIO = 0.15
+SHORTFORM_SAFE_BOTTOM_RATIO = 0.35
+SHORTFORM_CONTENT_HEIGHT = 960       # 1920 * (1 - 0.15 - 0.35)
+SHORTFORM_CONTENT_Y = 288            # 1920 * 0.15
+SHORTFORM_BLUR_STRENGTH = 20
+SHORTFORM_MAX_DURATION = 180         # 숏폼 최대 길이 3분 (초)

@@ -31,12 +31,14 @@ class ExportJob:
         video_path: str,
         start_time: float,
         end_time: float,
+        layout: str = "original",
     ):
         self.export_id = export_id
         self.highlight_id = highlight_id
         self.video_path = video_path
         self.start_time = start_time
         self.end_time = end_time
+        self.layout = layout
         self.status = ExportStatus.PENDING
         self.output_path: Optional[str] = None
         self.error_message: Optional[str] = None
@@ -50,6 +52,7 @@ class ExportJob:
             "video_path": self.video_path,
             "start_time": self.start_time,
             "end_time": self.end_time,
+            "layout": self.layout,
             "status": self.status.value,
             "created_at": self.created_at.isoformat(),
         }
@@ -70,6 +73,7 @@ class ExportJob:
             start_time=float(data["start_time"]),
             end_time=float(data["end_time"]),
         )
+        job.layout = data.get("layout", "original")
         job.status = ExportStatus(data["status"])
         job.output_path = data.get("output_path")
         job.error_message = data.get("error_message")
@@ -113,6 +117,7 @@ class ExportProcessor:
         video_path: str,
         start_time: float,
         end_time: float,
+        layout: str = "original",
     ) -> ExportJob:
         """Create a new export job"""
         export_id = f"export_{uuid.uuid4().hex[:8]}"
@@ -123,6 +128,7 @@ class ExportProcessor:
             video_path=video_path,
             start_time=start_time,
             end_time=end_time,
+            layout=layout,
         )
         await self._save_job(job)
         return job
@@ -148,23 +154,40 @@ class ExportProcessor:
 
         # Generate output filename
         duration = job.end_time - job.start_time
-        output_filename = f"{job.highlight_id}_{int(job.start_time)}_{int(job.end_time)}.mp4"
+
+        # 숏폼 모드: 최대 길이 제한
+        if job.layout == "shortform":
+            from core.constants import SHORTFORM_MAX_DURATION
+            if duration > SHORTFORM_MAX_DURATION:
+                job.status = ExportStatus.ERROR
+                job.error_message = f"숏폼 모드는 최대 {SHORTFORM_MAX_DURATION}초까지 지원합니다 (현재: {int(duration)}초)"
+                await self._save_job(job)
+                return job
+
+        suffix = "_sf" if job.layout == "shortform" else ""
+        output_filename = f"{job.highlight_id}_{int(job.start_time)}_{int(job.end_time)}{suffix}.mp4"
         output_path = self.output_dir / output_filename
 
         try:
-            cmd = [
-                "ffmpeg",
-                "-y",
-                "-ss", str(job.start_time),
-                "-i", job.video_path,
-                "-t", str(duration),
-                "-c:v", "libx264",
-                "-c:a", "aac",
-                "-preset", "fast",
-                "-crf", "23",
-                "-movflags", "+faststart",
-                str(output_path),
-            ]
+            if job.layout == "shortform":
+                src_w, src_h = await self._get_video_dimensions(job.video_path)
+                cmd = self._build_shortform_cmd(
+                    job.video_path, str(output_path),
+                    job.start_time, duration, src_w, src_h,
+                )
+            else:
+                cmd = [
+                    "ffmpeg", "-y",
+                    "-ss", str(job.start_time),
+                    "-i", job.video_path,
+                    "-t", str(duration),
+                    "-c:v", "libx264",
+                    "-c:a", "aac",
+                    "-preset", "fast",
+                    "-crf", "23",
+                    "-movflags", "+faststart",
+                    str(output_path),
+                ]
 
             process = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -188,6 +211,85 @@ class ExportProcessor:
 
         await self._save_job(job)
         return job
+
+    async def _get_video_dimensions(self, video_path: str) -> tuple[int, int]:
+        """ffprobe로 영상 width/height 조회"""
+        cmd = [
+            "ffprobe",
+            "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=width,height",
+            "-of", "csv=p=0:s=x",
+            video_path,
+        ]
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await process.communicate()
+        parts = stdout.decode().strip().split("x")
+        return int(parts[0]), int(parts[1])
+
+    def _build_shortform_cmd(
+        self,
+        input_path: str,
+        output_path: str,
+        start_time: float,
+        duration: float,
+        src_width: int,
+        src_height: int,
+    ) -> list[str]:
+        """9:16 숏폼 레이아웃 FFmpeg 커맨드 빌드"""
+        from core.constants import (
+            SHORTFORM_WIDTH, SHORTFORM_HEIGHT,
+            SHORTFORM_CONTENT_HEIGHT, SHORTFORM_CONTENT_Y,
+            SHORTFORM_BLUR_STRENGTH,
+        )
+
+        W = SHORTFORM_WIDTH
+        H = SHORTFORM_HEIGHT
+        CY = SHORTFORM_CONTENT_Y
+        CH = SHORTFORM_CONTENT_HEIGHT
+        BLUR = SHORTFORM_BLUR_STRENGTH
+
+        is_portrait = src_height > src_width
+
+        if is_portrait:
+            vf = f"scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1"
+            return [
+                "ffmpeg", "-y",
+                "-ss", str(start_time),
+                "-i", input_path,
+                "-t", str(duration),
+                "-vf", vf,
+                "-c:v", "libx264",
+                "-c:a", "aac",
+                "-preset", "fast",
+                "-crf", "23",
+                "-movflags", "+faststart",
+                output_path,
+            ]
+        else:
+            filter_complex = (
+                f"[0:v]scale={W}:{H},boxblur={BLUR}:{BLUR}[bg];"
+                f"[0:v]scale='if(gt(iw/ih,{W}/{CH}),{W},-2)'"
+                f":'if(gt(iw/ih,{W}/{CH}),-2,{CH})'[fg];"
+                f"[bg][fg]overlay=(W-w)/2:{CY}+({CH}-h)/2,setsar=1"
+            )
+            return [
+                "ffmpeg", "-y",
+                "-ss", str(start_time),
+                "-i", input_path,
+                "-t", str(duration),
+                "-filter_complex", filter_complex,
+                "-c:v", "libx264",
+                "-c:a", "aac",
+                "-preset", "fast",
+                "-crf", "23",
+                "-movflags", "+faststart",
+                output_path,
+            ]
 
     async def get_job(self, export_id: str) -> Optional[ExportJob]:
         """Get export job by ID"""

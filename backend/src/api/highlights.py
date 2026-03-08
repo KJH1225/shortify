@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from models import HighlightResponse, ApiResponse, ApiError
+from models.schemas import ExportRequest
 from infrastructure.database import get_db
 from infrastructure.repository import HighlightRepository, VideoRepository
 from services.export_processor import export_processor, ExportStatus
@@ -45,6 +46,7 @@ async def get_highlight(highlight_id: int, db: AsyncSession = Depends(get_db)):
 async def export_highlight(
     highlight_id: int,
     background_tasks: BackgroundTasks,
+    export_request: ExportRequest = ExportRequest(),
     db: AsyncSession = Depends(get_db),
 ):
     """하이라이트를 숏폼 영상으로 내보내기 (FFmpeg 사용)"""
@@ -89,6 +91,7 @@ async def export_highlight(
         video_path=video_path or "",
         start_time=highlight.start_time,
         end_time=highlight.end_time,
+        layout=export_request.layout.value,
     )
 
     # Calculate estimated time (rough estimate based on duration)

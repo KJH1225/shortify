@@ -21,7 +21,7 @@ function isValidImageUrl(url: string): boolean {
 interface HighlightCardProps {
   highlight: Highlight;
   onPlay: (highlight: Highlight) => void;
-  onExport: (highlight: Highlight) => void;
+  onExport: (highlight: Highlight, layout: 'original' | 'shortform') => void;
   isExporting?: boolean;
 }
 
@@ -51,7 +51,7 @@ export function HighlightCard({ highlight, onPlay, onExport, isExporting = false
               <Play className="h-12 w-12 text-muted-foreground" />
             </div>
           )}
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
             <Button
               size="icon"
               variant="secondary"
@@ -59,19 +59,6 @@ export function HighlightCard({ highlight, onPlay, onExport, isExporting = false
               onClick={() => onPlay(highlight)}
             >
               <Play className="h-5 w-5" />
-            </Button>
-            <Button
-              size="icon"
-              variant="secondary"
-              className="rounded-full"
-              onClick={() => onExport(highlight)}
-              disabled={isExporting}
-            >
-              {isExporting ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <Download className="h-5 w-5" />
-              )}
             </Button>
           </div>
           <div className="absolute bottom-2 right-2 px-2 py-1 rounded bg-black/70 text-xs text-white">
@@ -93,6 +80,27 @@ export function HighlightCard({ highlight, onPlay, onExport, isExporting = false
               <Star className="h-3 w-3 text-yellow-500" />
               <span>{Math.round(highlight.score * 100)}%</span>
             </div>
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 text-xs"
+              onClick={() => onExport(highlight, 'original')}
+              disabled={isExporting}
+            >
+              {isExporting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Download className="h-3 w-3 mr-1" />}
+              원본
+            </Button>
+            <Button
+              size="sm"
+              className="flex-1 text-xs bg-violet-600 hover:bg-violet-700"
+              onClick={() => onExport(highlight, 'shortform')}
+              disabled={isExporting}
+            >
+              {isExporting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Download className="h-3 w-3 mr-1" />}
+              숏폼 9:16
+            </Button>
           </div>
         </div>
       </CardContent>

@@ -6,7 +6,7 @@ import type { Highlight } from '@/types';
 interface HighlightGridProps {
   highlights: Highlight[];
   onPlay: (highlight: Highlight) => void;
-  onExport: (highlight: Highlight) => void;
+  onExport: (highlight: Highlight, layout: 'original' | 'shortform') => void;
   exportingHighlightId?: number | null;
 }
 

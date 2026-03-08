@@ -61,3 +61,12 @@ class ProcessingUpdate(BaseModel):
     status: ProcessingStatus
     progress: int
     message: str
+
+
+class ExportLayout(str, Enum):
+    ORIGINAL = "original"
+    SHORTFORM = "shortform"
+
+
+class ExportRequest(BaseModel):
+    layout: ExportLayout = ExportLayout.ORIGINAL
