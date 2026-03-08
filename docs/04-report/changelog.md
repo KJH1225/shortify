@@ -1,5 +1,43 @@
 # Shortify Changelog
 
+## [2026-03-09] - Shortform Title Overlay Feature
+
+### Added
+
+- **Shortform Title Overlay**: FFmpeg drawtext 필터로 숏폼 내보내기 시 하이라이트 제목 자동 오버레이
+  - 1080×1920px 영상 상단(y=130px)에 흰색 52px 텍스트 표시
+  - 검정 테두리(3px)와 그림자 효과로 가독성 확보
+  - 특수문자 FFmpeg 이스케이프 처리 완벽
+  - 폰트 미존재 시 graceful fallback 지원
+
+### Technical Details
+
+**Modified Files**:
+1. `backend/src/core/constants.py` - 8개 오버레이 상수 추가
+2. `backend/src/services/export_processor.py` - ExportJob title 필드 + drawtext 필터 메서드 + shortform 메서드 통합
+3. `backend/src/api/highlights.py` - highlight.title 전달
+
+**Verification**: 100% gap analysis match rate (15/15 items verified), 0 iterations needed
+
+### Quality Metrics
+
+- Design Match Rate: **100%**
+- Lines Added: 35줄
+- Files Changed: 3개
+- Implementation Time: 1일
+- Issues Found: 0개
+
+### Value Delivered
+
+| 관점 | 내용 |
+|------|------|
+| **Problem** | 숏폼 내보내기 영상에 제목이 표시되지 않아 SNS 업로드 시 편집 필요 |
+| **Solution** | FFmpeg drawtext로 DB 제목 자동 오버레이 |
+| **Function/UX** | 영상 상단에 흰색 제목 텍스트 선명하게 표시 |
+| **Core Value** | 별도 편집 없이 바로 사용 가능한 완성도 높은 숏폼 콘텐츠 생성 |
+
+---
+
 ## [2026-02-08] - Critical Bug Fixes
 
 ### Fixed

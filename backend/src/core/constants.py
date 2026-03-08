@@ -126,6 +126,16 @@ SHORTFORM_CONTENT_Y = 288            # 1920 * 0.15
 SHORTFORM_BLUR_STRENGTH = 20
 SHORTFORM_MAX_DURATION = 180         # 숏폼 최대 길이 3분 (초)
 
+# Shortform title overlay constants
+SHORTFORM_TITLE_FONTSIZE = 52
+SHORTFORM_TITLE_Y = 130
+SHORTFORM_TITLE_FONTCOLOR = "white"
+SHORTFORM_TITLE_BORDERW = 3
+SHORTFORM_TITLE_SHADOWCOLOR = "black@0.5"
+SHORTFORM_TITLE_SHADOWX = 2
+SHORTFORM_TITLE_SHADOWY = 2
+SHORTFORM_TITLE_FONT = "/System/Library/Fonts/AppleSDGothicNeo.ttc"
+
 # Multimodal highlight analysis prompts
 MULTIMODAL_SYSTEM_PROMPT = """You are a professional video highlight extraction and editing expert.
 You can see video frames, read transcripts, and analyze audio patterns.

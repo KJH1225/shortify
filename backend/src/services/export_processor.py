@@ -5,6 +5,7 @@ import asyncio
 import json
 import subprocess
 import os
+import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -34,6 +35,7 @@ class ExportJob:
         end_time: float,
         layout: str = "original",
         clips: list[dict] | None = None,
+        title: str = "",
     ):
         self.export_id = export_id
         self.highlight_id = highlight_id
@@ -42,6 +44,7 @@ class ExportJob:
         self.end_time = end_time
         self.layout = layout
         self.clips = clips
+        self.title = title
         self.status = ExportStatus.PENDING
         self.output_path: Optional[str] = None
         self.error_message: Optional[str] = None
@@ -57,6 +60,7 @@ class ExportJob:
             "end_time": self.end_time,
             "layout": self.layout,
             "clips": json.dumps(self.clips) if self.clips else "",
+            "title": self.title,
             "status": self.status.value,
             "created_at": self.created_at.isoformat(),
         }
@@ -78,6 +82,7 @@ class ExportJob:
             end_time=float(data["end_time"]),
         )
         job.layout = data.get("layout", "original")
+        job.title = data.get("title", "")
         clips_raw = data.get("clips", "")
         job.clips = json.loads(clips_raw) if clips_raw else None
         job.status = ExportStatus(data["status"])
@@ -136,6 +141,7 @@ class ExportProcessor:
         end_time: float,
         layout: str = "original",
         clips: list[dict] | None = None,
+        title: str = "",
     ) -> ExportJob:
         """Create a new export job"""
         export_id = f"export_{uuid.uuid4().hex[:8]}"
@@ -148,6 +154,7 @@ class ExportProcessor:
             end_time=end_time,
             layout=layout,
             clips=clips,
+            title=title,
         )
         await self._save_job(job)
         return job
@@ -187,14 +194,19 @@ class ExportProcessor:
         output_filename = f"{job.highlight_id}_{int(job.start_time)}_{int(job.end_time)}{suffix}.mp4"
         output_path = self.output_dir / output_filename
 
+        title_img_path = None
         try:
+            # Generate title overlay image for shortform
+            if job.layout == "shortform" and job.title:
+                title_img_path = self._generate_title_image(job.title)
+
             has_multi_clips = job.clips and len(job.clips) > 1
 
             if has_multi_clips and job.layout == "shortform":
                 src_w, src_h = await self._get_video_dimensions(job.video_path)
                 cmd = self._build_shortform_concat_cmd(
                     job.video_path, str(output_path), job.clips,
-                    src_w, src_h,
+                    src_w, src_h, title_img_path=title_img_path,
                 )
             elif has_multi_clips:
                 cmd = self._build_concat_cmd(
@@ -205,6 +217,7 @@ class ExportProcessor:
                 cmd = self._build_shortform_cmd(
                     job.video_path, str(output_path),
                     job.start_time, duration, src_w, src_h,
+                    title_img_path=title_img_path,
                 )
             else:
                 cmd = [
@@ -239,6 +252,9 @@ class ExportProcessor:
         except Exception as e:
             job.status = ExportStatus.ERROR
             job.error_message = str(e)
+        finally:
+            if title_img_path and os.path.exists(title_img_path):
+                os.unlink(title_img_path)
 
         await self._save_job(job)
         return job
@@ -262,6 +278,57 @@ class ExportProcessor:
         parts = stdout.decode().strip().split("x")
         return int(parts[0]), int(parts[1])
 
+    def _generate_title_image(self, title: str) -> str | None:
+        """Pillow로 제목 텍스트 투명 PNG 생성. title이 없으면 None 반환."""
+        if not title:
+            return None
+
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+        except ImportError:
+            return None
+
+        from core.constants import (
+            SHORTFORM_WIDTH, SHORTFORM_CONTENT_Y,
+            SHORTFORM_TITLE_FONTSIZE, SHORTFORM_TITLE_Y,
+            SHORTFORM_TITLE_FONT, SHORTFORM_TITLE_BORDERW,
+            SHORTFORM_TITLE_SHADOWX, SHORTFORM_TITLE_SHADOWY,
+        )
+
+        W = SHORTFORM_WIDTH
+        H = SHORTFORM_CONTENT_Y  # 288px (top safe zone)
+
+        img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+
+        try:
+            font = ImageFont.truetype(SHORTFORM_TITLE_FONT, SHORTFORM_TITLE_FONTSIZE)
+        except (OSError, IOError):
+            return None
+
+        bbox = draw.textbbox((0, 0), title, font=font)
+        text_w = bbox[2] - bbox[0]
+        text_x = (W - text_w) // 2
+        text_y = SHORTFORM_TITLE_Y
+
+        # Shadow
+        draw.text(
+            (text_x + SHORTFORM_TITLE_SHADOWX, text_y + SHORTFORM_TITLE_SHADOWY),
+            title, font=font, fill=(0, 0, 0, 128),
+        )
+        # Main text with stroke
+        draw.text(
+            (text_x, text_y), title, font=font, fill="white",
+            stroke_width=SHORTFORM_TITLE_BORDERW, stroke_fill="black",
+        )
+
+        tmp = tempfile.NamedTemporaryFile(
+            suffix=".png", delete=False, dir=str(self.output_dir),
+        )
+        img.save(tmp.name, "PNG")
+        tmp.close()
+        return tmp.name
+
     def _build_shortform_cmd(
         self,
         input_path: str,
@@ -270,6 +337,7 @@ class ExportProcessor:
         duration: float,
         src_width: int,
         src_height: int,
+        title_img_path: str | None = None,
     ) -> list[str]:
         """9:16 숏폼 레이아웃 FFmpeg 커맨드 빌드"""
         from core.constants import (
@@ -286,14 +354,25 @@ class ExportProcessor:
 
         is_portrait = src_height > src_width
 
+        inputs = [
+            "-ss", str(start_time),
+            "-i", input_path,
+            "-t", str(duration),
+        ]
+        if title_img_path:
+            inputs.extend(["-i", title_img_path])
+
         if is_portrait:
-            vf = f"scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1"
+            base = f"[0:v]scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1"
+            if title_img_path:
+                filter_complex = f"{base}[base];[base][1:v]overlay=0:0"
+            else:
+                filter_complex = base
             return [
                 "ffmpeg", "-y",
-                "-ss", str(start_time),
-                "-i", input_path,
-                "-t", str(duration),
-                "-vf", vf,
+                *inputs,
+                "-filter_complex", filter_complex,
+                "-map", "0:a",
                 "-c:v", "libx264",
                 "-c:a", "aac",
                 "-preset", "fast",
@@ -302,18 +381,21 @@ class ExportProcessor:
                 output_path,
             ]
         else:
-            filter_complex = (
+            base = (
                 f"[0:v]scale={W}:{H},boxblur={BLUR}:{BLUR}[bg];"
                 f"[0:v]scale='if(gt(iw/ih,{W}/{CH}),{W},-2)'"
                 f":'if(gt(iw/ih,{W}/{CH}),-2,{CH})'[fg];"
                 f"[bg][fg]overlay=(W-w)/2:{CY}+({CH}-h)/2,setsar=1"
             )
+            if title_img_path:
+                filter_complex = f"{base}[base];[base][1:v]overlay=0:0"
+            else:
+                filter_complex = base
             return [
                 "ffmpeg", "-y",
-                "-ss", str(start_time),
-                "-i", input_path,
-                "-t", str(duration),
+                *inputs,
                 "-filter_complex", filter_complex,
+                "-map", "0:a",
                 "-c:v", "libx264",
                 "-c:a", "aac",
                 "-preset", "fast",
@@ -390,6 +472,7 @@ class ExportProcessor:
         clips: list[dict],
         src_width: int,
         src_height: int,
+        title_img_path: str | None = None,
     ) -> list[str]:
         """서브클립 concat + 9:16 숏폼 레이아웃 FFmpeg 커맨드 (xfade 크로스페이드 + 폴백)"""
         from core.constants import (
@@ -416,6 +499,11 @@ class ExportProcessor:
             inputs.extend(["-ss", str(clip["start"]), "-t", str(dur), "-i", input_path])
             filter_parts.append(f"[{i}:v]setpts=PTS-STARTPTS[v{i}]")
             filter_parts.append(f"[{i}:a]asetpts=PTS-STARTPTS[a{i}]")
+
+        # Title image is the last input (index = n)
+        if title_img_path:
+            inputs.extend(["-i", title_img_path])
+            title_idx = n
 
         if use_xfade:
             durations = [clip["end"] - clip["start"] for clip in clips]
@@ -446,18 +534,26 @@ class ExportProcessor:
 
         # Shortform layout
         if is_portrait:
-            filter_parts.append(
+            base = (
                 f"[cv]scale={W}:{H}:force_original_aspect_ratio=decrease,"
-                f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1[outv]"
+                f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1"
             )
+            if title_img_path:
+                filter_parts.append(f"{base}[sf_base];[sf_base][{title_idx}:v]overlay=0:0[outv]")
+            else:
+                filter_parts.append(f"{base}[outv]")
         else:
             filter_parts.append(f"[cv]split=2[cv_bg][cv_fg]")
-            filter_parts.append(
+            base = (
                 f"[cv_bg]scale={W}:{H},boxblur={BLUR}:{BLUR}[bg];"
                 f"[cv_fg]scale='if(gt(iw/ih,{W}/{CH}),{W},-2)'"
                 f":'if(gt(iw/ih,{W}/{CH}),-2,{CH})'[fg];"
-                f"[bg][fg]overlay=(W-w)/2:{CY}+({CH}-h)/2,setsar=1[outv]"
+                f"[bg][fg]overlay=(W-w)/2:{CY}+({CH}-h)/2,setsar=1"
             )
+            if title_img_path:
+                filter_parts.append(f"{base}[sf_base];[sf_base][{title_idx}:v]overlay=0:0[outv]")
+            else:
+                filter_parts.append(f"{base}[outv]")
 
         filter_parts.append("[ca]anull[outa]")
         filter_complex = ";".join(filter_parts)

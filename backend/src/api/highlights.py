@@ -94,6 +94,7 @@ async def export_highlight(
         end_time=highlight.end_time,
         layout=export_request.layout.value,
         clips=highlight.clips,
+        title=highlight.title or "",
     )
 
     # Calculate estimated time (rough estimate based on duration)
