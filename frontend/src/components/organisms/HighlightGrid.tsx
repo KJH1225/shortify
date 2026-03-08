@@ -15,7 +15,7 @@ export function HighlightGrid({ highlights, onPlay, onExport, exportingHighlight
     return (
       <div className="text-center py-12">
         <p className="text-muted-foreground">
-          영상을 업로드하면 AI가 하이라이트 구간을 자동으로 추출해요
+          {/* 영상을 업로드하면 AI가 하이라이트 구간을 자동으로 추출해요 */}
         </p>
       </div>
     );
