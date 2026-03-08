@@ -86,6 +86,7 @@ DATABASE_URL=sqlite+aiosqlite:///./shortify.db
 # Production: mysql+aiomysql://user:pass@localhost:3306/shortify
 OPENAI_API_KEY=your-openai-api-key
 UPLOAD_DIR=./uploads
+REDIS_URL=redis://localhost:6379/0
 ```
 
 ### 데이터베이스 마이그레이션
@@ -204,8 +205,8 @@ shortify/
 
 | 항목 | 현재 | 프로덕션 권장 |
 |------|------|---------------|
-| Rate Limit Storage | In-memory | Redis |
-| Export Job Storage | In-memory | Redis/DB |
+| Rate Limit Storage | Redis | Redis |
+| Export Job Storage | Redis | Redis/DB |
 | Large File Chunking | FFmpeg 기반 | 분산 처리 |
 | Authentication | None | JWT/OAuth |
 

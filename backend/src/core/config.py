@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     upload_dir: str = "./uploads"
     max_file_size: int = 2 * 1024 * 1024 * 1024  # 2GB
 
+    # Redis
+    redis_url: str = "redis://localhost:6379/0"
+    export_job_ttl_seconds: int = 24 * 60 * 60
+
     class Config:
         env_file = "../.env"
 
